@@ -29,14 +29,14 @@ limitations under the License.
 
         <!-- check for xmlbeans-*.jar from binary distribution -->
         <pathconvert property="xmlbeans.lib" setonempty="false" pathsep=" ">
-            <path><fileset dir="${xmlbeans.home}/libs" includes="xmlbeans-*.jar" /></path>
+            <path><fileset dir="${xmlbeans.home}/lib" includes="xmlbeans-*.jar" /></path>
         </pathconvert>
 
         <fail message="Set XMLBEANS_HOME in your enviornment." unless="xmlbeans.lib"/>
 
         <echo message="xmlbeans.lib: ${xmlbeans.lib}"/>
         <path id="xmlbeans.path">
-            <fileset dir="${xmlbeans.home}/libs" includes="*.jar"/>
+            <fileset dir="${xmlbeans.home}/lib" includes="*.jar"/>
         </path>
 
         <taskdef name="scomp"
@@ -79,10 +79,10 @@ limitations under the License.
         </scomp>
 
         <pathconvert property="exe" setonempty="false">
-            <fileset dir="${env.JAVA_HOME}/bin" includes="javac, javac.exe"/>
+            <fileset dir="${env.JAVA_HOME}/bin" includes="javac, javac.exe" erroronmissingdir="false"/>
         </pathconvert>
         <pathconvert property="exe" setonempty="false">
-            <fileset dir="${env.JAVA_HOME}/../bin" includes="javac, javac.exe"/>
+            <fileset dir="${env.JAVA_HOME}/../bin" includes="javac, javac.exe" erroronmissingdir="false"/>
         </pathconvert>
 
         <javac srcdir="src" destdir="build" debug="on" source="1.8" executable="${exe}" fork="yes">
