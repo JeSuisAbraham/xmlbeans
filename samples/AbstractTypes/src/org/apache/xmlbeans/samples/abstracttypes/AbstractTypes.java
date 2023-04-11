@@ -16,6 +16,7 @@ package org.apache.xmlbeans.samples.abstracttypes;
 
 import abstractFigures.*;
 import figures.*;
+import org.apache.xmlbeans.XmlException;
 import org.apache.xmlbeans.XmlObject;
 import org.apache.xmlbeans.XmlOptions;
 
@@ -42,10 +43,20 @@ public class AbstractTypes
       {
         t.printStackTrace();
       }
+      try
+      {
+        parseDocument(true);
+      }
+      catch (Throwable t)
+      {
+        t.printStackTrace();
+      }
     }
 
     public static XmlObject buildDocument(boolean enableOutput)
     {
+        if (enableOutput)
+            System.out.println("buildDocument:\n");
         XmlOptions opt = (new XmlOptions()).setSavePrettyPrint();
 
         // Build a new document
@@ -84,6 +95,8 @@ public class AbstractTypes
 
     public static XmlObject buildDocument2(boolean enableOutput)
     {
+        if (enableOutput)
+            System.out.println("buildDocument2:\n");
         XmlOptions opt = (new XmlOptions()).setSavePrettyPrint();
 
         // Build a new document
@@ -106,5 +119,34 @@ public class AbstractTypes
         }
 
         return doc;
+    }
+    
+    public static void parseDocument(boolean enableOutput) throws XmlException
+    {
+        if (enableOutput)
+            System.out.println("parseDocument:\n");
+        XmlOptions opt = (new XmlOptions()).setSavePrettyPrint();
+
+        String document = 
+            "<abs:root xmlns:abs=\"AbstractFigures\">\r\n"
+            + "  <figure xsi:type=\"fig:circle\" xmlns:fig=\"Figures\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\r\n"
+            + "    <radius>10.0</radius>\r\n"
+            + "  </figure>\r\n"
+            + "  <figure xsi:type=\"fig:square\" xmlns:fig=\"Figures\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\r\n"
+            + "    <side>20.0</side>\r\n"
+            + "  </figure>\r\n"
+            + "</abs:root>";
+        RootDocument doc = RootDocument.Factory.parse(document);
+        
+        Shape[] shapeArray = doc.getRoot().getFigureArray();
+        System.out.println("Shape #1 is a Circle? " + (shapeArray[0] instanceof Circle));
+        System.out.println("Shape #2 is a Square? " + (shapeArray[1] instanceof Square));
+
+        // Document contains two concrete shapes and is valid
+        if (enableOutput)
+        {
+            System.out.println("Final document:\n" + doc.xmlText(opt));
+            System.out.println("Valid = " + doc.validate());
+        }
     }
 }
