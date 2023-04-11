@@ -26,7 +26,22 @@ public class AbstractTypes
 {
     public static void main(String[] args)
     {
+      try
+      {
         buildDocument(true);
+      }
+      catch (Throwable t)
+      {
+        t.printStackTrace();
+      }
+      try
+      {
+        buildDocument2(true);
+      }
+      catch (Throwable t)
+      {
+        t.printStackTrace();
+      }
     }
 
     public static XmlObject buildDocument(boolean enableOutput)
@@ -61,7 +76,33 @@ public class AbstractTypes
         if (enableOutput)
         {
             System.out.println("Final document:\n" + doc.xmlText(opt));
-            System.out.println("Vald = " + doc.validate());
+            System.out.println("Valid = " + doc.validate());
+        }
+
+        return doc;
+    }
+
+    public static XmlObject buildDocument2(boolean enableOutput)
+    {
+        XmlOptions opt = (new XmlOptions()).setSavePrettyPrint();
+
+        // Build a new document
+        RootDocument doc = RootDocument.Factory.newInstance();
+        RootDocument.Root figures = doc.addNewRoot();
+        if (enableOutput)
+            System.out.println("Empty document:\n" + doc.xmlText(opt) + "\n");
+
+        Circle circle = Circle.Factory.newInstance();
+        circle.setRadius(10.0);
+        Square square = Square.Factory.newInstance();
+        square.setSide(20.0);
+        figures.setFigureArray(new Shape[] {circle, square});
+
+        // Document contains two concrete shapes and is valid
+        if (enableOutput)
+        {
+            System.out.println("Final document:\n" + doc.xmlText(opt));
+            System.out.println("Valid = " + doc.validate());
         }
 
         return doc;
