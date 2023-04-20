@@ -79,6 +79,7 @@ def testSchemas =  [
     [dir:'src/test/resources/xbean',path:'dom',name:'sDOM'],
     [dir:'src/test/resources/xbean',path:'xmlcursor',name:'sXMLCURSOR'],
     [dir:'src/test/resources/xbean',path:'scomp',name:'sSCOMP'],
+    [dir:'src/test/resources/xbean',path:'scomp2',name:'sSCOMP2',dependsOn:'sSCOMP'],
     [dir:'src/test/resources/xbean',path:'simple',name:'sSIMPLE'],
     [dir:'src/test/resources/xbean',path:'ValidatingStream',name:'sVALIDATE'],
     [dir:'src/test/resources/xbean',path:'usertype',name:'sUSERTYPE'],
@@ -190,8 +191,9 @@ wrapper {
 }
 
 def extCP = files(configurations.testCompileClasspath + sourceSets.main.output.files + sourceSets.main.resources.srcDirs)
+def scomp2CP = files(configurations.genresources + sourceSets.test.resources.srcDirs)
 testSchemas.each {
-    schemaGenTask(it.name, 'test', (it.name =~ /sEXT/ ? extCP : configurations.genresources), it.dir, "${it.path}:${it.name}")
+    schemaGenTask(it.name, 'test', (it.name =~ /sEXT/ ? extCP : it.name =~ /sSCOMP2/ ? scomp2CP : configurations.genresources), it.dir, it.dependsOn, "${it.path}:${it.name}")
 }
 
 task adjustWrapperPropertiesFile {
@@ -206,13 +208,19 @@ task adjustWrapperPropertiesFile {
 wrapper.finalizedBy adjustWrapperPropertiesFile
 
 // https://discuss.gradle.org/t/passing-arguments-to-a-task/8427
-def schemaGenTask(String baseName, String mainTest, FileCollection beansPath, String xsdDir, String... xsdIncludes) {
+def schemaGenTask(String baseName, String mainTest, FileCollection beansPath, String xsdDir, String depends, String... xsdIncludes) {
     String srcDir = "build/generated/sources/${baseName}/${mainTest}/java"
     String rscDir = "build/generated/sources/${baseName}/${mainTest}/resources"
 
     Map<String,String> map = xsdIncludes.collectEntries{it.split(':')}
 
     return tasks.create("${baseName}_SchemaGen") {
+
+        if (depends) {
+            dependsOn {
+                "${depends}_SchemaGen"
+            }
+        }
 
         FileTree inputFiles = fileTree(dir: xsdDir, includes: map.keySet().collect{ it.split(' ')}.flatten())
 
@@ -250,7 +258,7 @@ def schemaGenTask(String baseName, String mainTest, FileCollection beansPath, St
 }
 
 
-schemaGenTask('bootstrap', 'main', configurations.bootstrap, 'src/main/schema', 'xml:sXMLLANG','xsd:sXMLSCHEMA','config:sXMLCONFIG','tools:sXMLTOOLS')
+schemaGenTask('bootstrap', 'main', configurations.bootstrap, 'src/main/schema', null,'xml:sXMLLANG','xsd:sXMLSCHEMA','config:sXMLCONFIG','tools:sXMLTOOLS')
 task bootstrapMigrate(type: JavaCompile) {
     dependsOn 'bootstrap_SchemaGen'
     source files('build/generated/sources/bootstrap/main/java', 'src/main/java')
@@ -260,7 +268,7 @@ task bootstrapMigrate(type: JavaCompile) {
 }
 
 // base_SchemaGen
-schemaGenTask('base', 'main', configurations.genresources, 'src/main/schema', 'xml:sXMLLANG','xsd:sXMLSCHEMA','config:sXMLCONFIG','tools:sXMLTOOLS')
+schemaGenTask('base', 'main', configurations.genresources, 'src/main/schema', null, 'xml:sXMLLANG','xsd:sXMLSCHEMA','config:sXMLCONFIG','tools:sXMLTOOLS')
 base_SchemaGen.dependsOn 'bootstrapMigrate'
 
 task unpackTranXml(type: Copy) {
