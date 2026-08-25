@@ -187,7 +187,8 @@ wrapper {
 }
 
 def extCP = files(configurations.testCompileClasspath + sourceSets.main.output.files + sourceSets.main.resources.srcDirs)
-def scomp2CP = files(configurations.genresources + sourceSets.test.resources.srcDirs)
+// Use a lazy provider to avoid resolving genresources during configuration phase
+def scomp2CP = files({ configurations.genresources + sourceSets.test.resources.srcDirs })
 testSchemas.each {
     schemaGenTask(it.name, 'test', (it.name =~ /sEXT/ ? extCP : it.name =~ /sSCOMP2/ ? scomp2CP : configurations.genresources), it.dir, it.dependsOn, "${it.path}:${it.name}")
 }
