@@ -17,7 +17,7 @@ package org.apache.xmlbeans.impl.common;
 
 import org.apache.xmlbeans.xml.stream.XMLName;
 import javax.xml.namespace.QName;
-import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 
 public class XMLNameHelper
 {
@@ -54,7 +54,7 @@ public class XMLNameHelper
         if (name == null)
             return "null";
 
-        if (name.getNamespaceUri() == null || name.getNamespaceUri().length() == 0)
+        if (name.getNamespaceUri() == null || name.getNamespaceUri().isEmpty())
             return name.getLocalName();
         
         return name.getLocalName() + "@" + name.getNamespaceUri();
@@ -69,9 +69,7 @@ public class XMLNameHelper
             return true;
         if (c >= 'A' && c <= 'Z')
             return true;
-        if (c >= '0' && c <= '9')
-            return true;
-        return false;
+        return c >= '0' && c <= '9';
     }
 
     public static String hexsafe(String s)
@@ -86,21 +84,12 @@ public class XMLNameHelper
             }
             else
             {
-                byte[] utf8 = null;
-                try
-                {
-                    utf8 = s.substring(i, i + 1).getBytes("UTF-8");
+                byte[] utf8 = s.substring(i, i + 1).getBytes(StandardCharsets.UTF_8);
                 for (int j = 0; j < utf8.length; j++)
                 {
                     result.append('_');
                     result.append(hexdigits[(utf8[j] >> 4) & 0xF]);
                     result.append(hexdigits[utf8[j] & 0xF]);
-                    }
-                }
-                catch(UnsupportedEncodingException uee)
-                {
-                    // should never happen - UTF-8 is always supported
-                    result.append("_BAD_UTF8_CHAR");
                 }
             }
         }
@@ -109,7 +98,7 @@ public class XMLNameHelper
 
     public static String hexsafedir(XMLName name)
     {
-        if (name.getNamespaceUri() == null || name.getNamespaceUri().length() == 0)
+        if (name.getNamespaceUri() == null || name.getNamespaceUri().isEmpty())
             return "_nons/" + hexsafe(name.getLocalName());
         return hexsafe(name.getNamespaceUri()) + "/" + hexsafe(name.getLocalName());
     }

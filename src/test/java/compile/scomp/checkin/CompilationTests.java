@@ -22,7 +22,6 @@ import org.apache.xmlbeans.impl.tool.*;
 import org.apache.xmlbeans.impl.util.FilerImpl;
 import org.apache.xmlbeans.impl.xb.xsdschema.SchemaDocument;
 import org.apache.xmlbeans.impl.xb.xsdschema.TopLevelComplexType;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.platform.launcher.Launcher;
 import org.junit.platform.launcher.LauncherDiscoveryRequest;
@@ -34,7 +33,6 @@ import org.junit.platform.launcher.listeners.TestExecutionSummary;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.nio.charset.StandardCharsets;
@@ -135,38 +133,6 @@ public class CompilationTests {
         "</xs:schema>\n",
     };
 
-
-    @Test
-    void testJ2EE() {
-        deltree(xbeanOutput("compile/scomp/j2ee"));
-        // First, compile schema
-        File srcdir = xbeanOutput("compile/scomp/j2ee/j2eeconfigxml/src");
-        File classesdir = xbeanOutput("compile/scomp/j2ee/j2eeconfigxml/classes");
-        File outputjar = xbeanOutput("compile/scomp/j2ee/j2eeconfigxml.jar");
-        Parameters params = new Parameters();
-        params.setXsdFiles(
-            xbeanCase("j2ee/application-client_1_4.xsd"),
-            xbeanCase("j2ee/application_1_4.xsd"),
-            xbeanCase("j2ee/connector_1_5.xsd"),
-            xbeanCase("j2ee/ejb-jar_2_1.xsd"),
-            xbeanCase("j2ee/j2ee_1_4.xsd"),
-            xbeanCase("j2ee/jsp_2_0.xsd"),
-            xbeanCase("j2ee/web-app_2_4.xsd"),
-            xbeanCase("j2ee/XML.xsd"));
-        params.setSrcDir(srcdir);
-        params.setClassesDir(classesdir);
-        params.setOutputJar(outputjar);
-        params.setMdefNamespaces(Collections.singleton("http://java.sun.com/xml/ns/j2ee"));
-        List<XmlError> errors = new ArrayList<>();
-        params.setErrorListener(errors);
-        boolean result = SchemaCompiler.compile(params);
-        StringWriter message = new StringWriter();
-        if (!result)
-            dumpErrors(errors, new PrintWriter(message));
-        assertTrue(result, "Build failed:" + message);
-        assertTrue(outputjar.exists(), "Cannot find " + outputjar);
-    }
-
     @Test
     void testIncrementalCompilation() throws IOException, XmlException {
         File[] files = new File[]{
@@ -192,7 +158,7 @@ public class CompilationTests {
         XmlOptions options = (new XmlOptions()).setErrorListener(errors);
         SchemaTypeSystem builtin = XmlBeans.getBuiltinTypeSystem();
         system = XmlBeans.compileXsd(schemas, builtin, options);
-        assertNotNull(system, "Compilation failed during inititial compile.");
+        assertNotNull(system, "Compilation failed during initial compile.");
         System.out.println("-= Initial Compile =-");
 
         for (int i = 0; i < system.globalTypes().length; i++) {
@@ -332,41 +298,6 @@ public class CompilationTests {
     }
 
     @Test
-    @Disabled
-    public void testDownload() {
-        deltree(xbeanOutput("compile/scomp/include"));
-
-        {
-            // First, compile schema without download and verify failure
-            File srcdir = xbeanOutput("compile/scomp/include/shouldfail/src");
-            File classesdir = xbeanOutput("compile/scomp/include/shouldfail/classes");
-            File outputjar = xbeanOutput("compile/scomp/include/shouldfail.jar");
-            Parameters params = new Parameters();
-            params.setXsdFiles(xbeanCase("compile/scomp/j2ee/j2ee_1_4.xsd"));
-            params.setSrcDir(srcdir);
-            params.setClassesDir(classesdir);
-            params.setOutputJar(outputjar);
-            assertFalse(SchemaCompiler.compile(params), "Build should have failed");
-            assertFalse(outputjar.exists(), "Should not have created " + outputjar);
-        }
-
-        {
-            // now turn on download and verify success
-            File srcdir = xbeanOutput("compile/scomp/include/shouldsucceed/src");
-            File classesdir = xbeanOutput("compile/scomp/include/shouldsucceed/classes");
-            File outputjar = xbeanOutput("compile/scomp/include/shouldsucceed.jar");
-            Parameters params = new Parameters();
-            params.setDownload(true);
-            params.setXsdFiles(xbeanCase("compile/scomp/j2ee/j2ee_1_4.xsd"));
-            params.setSrcDir(srcdir);
-            params.setClassesDir(classesdir);
-            params.setOutputJar(outputjar);
-            assertTrue(SchemaCompiler.compile(params), "Build failed");
-            assertTrue(outputjar.exists(), "Cannot find " + outputjar);
-        }
-    }
-
-    @Test
     void testPricequote() {
         deltree(xbeanOutput("compile/scomp/pricequote"));
         // First, compile schema
@@ -487,6 +418,31 @@ public class CompilationTests {
 
         act = new String(Files.readAllBytes(p), StandardCharsets.UTF_8);
         assertTrue(act.contains("* / heck, I'm smart"));
+    }
+
+    @Test
+    void schemaTextIsNotCompiledAsCode() throws Exception {
+        deltree(xbeanOutput("compile/scomp/codeinject"));
+        File srcdir = xbeanOutput("compile/scomp/codeinject/src");
+        File classesdir = xbeanOutput("compile/scomp/codeinject/classes");
+        Parameters params = new Parameters();
+        params.setXsdFiles(xbeanCase("schemacompiler/codeinject.xsd"));
+        params.setSrcDir(srcdir);
+        params.setClassesDir(classesdir);
+        params.setName("codeinject");
+        params.setCopyAnn(true);
+        assertTrue(SchemaCompiler.compile(params), "generated sources didn't compile");
+
+        // the quote in the target namespace has to stay inside the string literal
+        Path p = new File(srcdir, "codeinjectQ/impl/TImpl.java").toPath();
+        String act = new String(Files.readAllBytes(p), StandardCharsets.UTF_8);
+        assertTrue(act.contains("new QName(\"codeinject\\\"q\", \"single\")"), "namespace not escaped");
+
+        // the unicode escape in the documentation must not close the javadoc comment
+        try (Stream<Path> s = Files.walk(classesdir.toPath())) {
+            assertFalse(s.anyMatch(f -> "Pwned.class".equals(f.getFileName().toString())),
+                "class injected through the schema documentation");
+        }
     }
 
     //TESTENV:

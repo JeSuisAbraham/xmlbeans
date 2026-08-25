@@ -64,7 +64,7 @@ public class Diff {
                 ioe.printStackTrace();
             }
         }
-        if (result.size() < 1) {
+        if (result.isEmpty()) {
             System.out.println("No differences encountered.");
         } else {
             System.out.println("Differences:");
@@ -251,8 +251,8 @@ public class Diff {
     public static void filesAsXsb(File file1, File file2, List<XmlError> diffs) {
         assert file1.exists() : "File \"" + file1.getAbsolutePath() + "\" does not exist.";
         assert file2.exists() : "File \"" + file2.getAbsolutePath() + "\" does not exist.";
-        try (FileInputStream stream1 = new FileInputStream(file1);
-             FileInputStream stream2 = new FileInputStream(file2)) {
+        try (InputStream stream1 = new FileInputStream(file1);
+             InputStream stream2 = new FileInputStream(file2)) {
             streamsAsXsb(stream1, file1.getName(), stream2, file2.getName(), diffs);
         } catch (IOException ignored) {
         }

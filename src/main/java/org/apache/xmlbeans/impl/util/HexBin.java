@@ -18,12 +18,14 @@ package org.apache.xmlbeans.impl.util;
 import java.nio.charset.StandardCharsets;
 
 /**
- * format validation
+ * This class encodes/decodes hexadecimal data.
  * <p>
- * This class encodes/decodes hexadecimal data
+ *     This class is for internal use in Apache XMLBeans. If you need to do your own hexadecimal
+ *     encoding/decoding, please find another library that specialises in this sort of support.
+ * </p>
  */
 public final class HexBin {
-    static private final int BASELENGTH = 255;
+    static private final int BASELENGTH = 256;
     static private final int LOOKUPLENGTH = 16;
     static private final byte[] hexNumberTable = new byte[BASELENGTH];
     static private final byte[] lookUpHexAlphabet = new byte[LOOKUPLENGTH];
@@ -55,7 +57,11 @@ public final class HexBin {
      * byte to be tested if it is Base64 alphabet
      */
     static boolean isHex(byte octect) {
-        return (hexNumberTable[octect] != -1);
+        // byte is a signed type and [] operator takes an int as an index.
+        // If use `octect` directly, negative byte will be promoted to the
+        // negative int and ArrayIndexOutOfBoundException will be thrown.
+        // `& 0xFF` will convert negative byte to positive int
+        return hexNumberTable[octect & 0xFF] != -1;
     }
 
     /**
@@ -94,6 +100,10 @@ public final class HexBin {
         return encodedData;
     }
 
+    /**
+     * @param binaryData input data
+     * @return decoded bytes - can return null if the input is null, empty or includes bytes that are not valid Hex
+     */
     static public byte[] decode(byte[] binaryData) {
         if (binaryData == null) {
             return null;

@@ -147,4 +147,25 @@ public class Deep {
         items.setProductArray(new ProductType[]{bShirt, shirt, genericProd});
         assertTrue(doc.validate(createOptions()));
     }
+
+    @Test
+    void testInsertAndDeleteMany() throws Throwable {
+        final int size = 100;
+        ItemsDocument doc = ItemsDocument.Factory.newInstance();
+        ItemType items = doc.addNewItems();
+        ShirtType[] shirts = new ShirtType[size];
+        for (int i = 0; i < size; i++) {
+            ShirtType shirt = ShirtType.Factory.newInstance();
+            shirt.setName("Funny Shirt " + i);
+            shirt.setNumber("SKU" + i);
+            shirt.setColor("green");
+            shirt.setSize(BigInteger.TEN);
+            shirts[i] = shirt;
+        }
+        items.setProductArray(shirts);
+        assertEquals(size, items.getProductArray().length);
+        items.setProductArray(new ProductType[0]);
+        assertEquals(0, items.getProductArray().length);
+    }
+
 }

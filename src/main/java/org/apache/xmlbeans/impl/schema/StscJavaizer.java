@@ -15,10 +15,10 @@
 
 package org.apache.xmlbeans.impl.schema;
 
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.xmlbeans.*;
 import org.apache.xmlbeans.impl.common.NameUtil;
+import org.apache.xmlbeans.impl.logging.XmlBeansLogManager;
 
 import javax.xml.namespace.QName;
 import java.math.BigInteger;
@@ -26,7 +26,7 @@ import java.util.*;
 
 public class StscJavaizer {
 
-    private static final Logger LOG = LogManager.getLogger(StscJavaizer.class);
+    private static final Logger LOG = XmlBeansLogManager.getLogger(StscJavaizer.class);
 
     /**
      * XMLBEANS-307
@@ -157,7 +157,7 @@ public class StscJavaizer {
     static String pickConstantName(Set<String> usedNames, String words) {
         String base = NameUtil.upperCaseUnderbar(words);
 
-        if (base.length() == 0) {
+        if (base.isEmpty()) {
             base = "X";
         }
 
@@ -337,7 +337,7 @@ public class StscJavaizer {
             // since they don't have another outer class
             ArrayList<SchemaType> list = new ArrayList<>();
             addAnonymousTypesFromRedefinition(outerType, list);
-            if (list.size() > 0) {
+            if (!list.isEmpty()) {
                 SchemaType[] temp = new SchemaType[nrOfAnonTypes + list.size()];
                 list.toArray(temp);
                 System.arraycopy(anonymousTypes, 0, temp, list.size(), nrOfAnonTypes);

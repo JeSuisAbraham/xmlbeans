@@ -83,7 +83,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
     }
 
     private static String makeSafe(String s) {
-        Charset charset = Charset.forName(System.getProperty("file.encoding"));
+        final Charset charset = Charset.defaultCharset();
         CharsetEncoder cEncoder = charset.newEncoder();
         StringBuilder result = new StringBuilder();
         int i;
@@ -168,7 +168,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         }
         String result = qname.getLocalPart();
         if (qname.getNamespaceURI() != null) {
-            result += "(@" + qname.getNamespaceURI() + ")";
+            result += "(@" + javaCommentEscape(qname.getNamespaceURI()) + ")";
         }
         return result;
     }
@@ -186,7 +186,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         }
 
         emit("/**");
-        if (opt.isCompileAnnotationAsJavadoc() && sType.getDocumentation() != null && sType.getDocumentation().length() > 0){
+        if (opt.isCompileAnnotationAsJavadoc() && sType.getDocumentation() != null && !sType.getDocumentation().isEmpty()){
             emit(" *");
             printJavaDocBody(sType.getDocumentation());
             emit(" *");
@@ -275,8 +275,8 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
 
 
         emit(factoryName + "<" + fullName + "> Factory = new " + factoryName +
-             "<>(" + sysName + ".TypeSystemHolder.typeSystem, \"" + ((SchemaTypeSystemImpl) system).handleForType(sType) + "\");"
-         );
+                "<>(" + sysName + ".TypeSystemHolder.typeSystem, \"" + ((SchemaTypeSystemImpl) system).handleForType(sType) + "\");"
+        );
         emit("org.apache.xmlbeans.SchemaType type = Factory.getType();");
         emit("");
     }
@@ -318,7 +318,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
 
     void printNestedInnerTypes(SchemaType sType, SchemaTypeSystem system) throws IOException {
         boolean redefinition = sType.getName() != null &&
-                               sType.getName().equals(sType.getBaseType().getName());
+                sType.getName().equals(sType.getBaseType().getName());
         while (sType != null) {
             SchemaType[] anonTypes = sType.getAnonymousTypes();
             for (SchemaType anonType : anonTypes) {
@@ -331,7 +331,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
             // For redefinition other than by extension for complex types, go ahead and print
             // the anonymous types in the base
             if (!redefinition ||
-                (sType.getDerivationType() != SchemaType.DT_EXTENSION && !sType.isSimpleType())) {
+                    (sType.getDerivationType() != SchemaType.DT_EXTENSION && !sType.isSimpleType())) {
                 break;
             }
             sType = sType.getBaseType();
@@ -345,7 +345,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         emit("/*");
         if (sType.getName() != null) {
             emit(" * XML Type:  " + sType.getName().getLocalPart());
-            emit(" * Namespace: " + sType.getName().getNamespaceURI());
+            emit(" * Namespace: " + javaCommentEscape(sType.getName().getNamespaceURI()));
         } else {
             QName thename = null;
 
@@ -362,7 +362,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
             assert (thename != null);
 
             emit(" * Localname: " + thename.getLocalPart());
-            emit(" * Namespace: " + thename.getNamespaceURI());
+            emit(" * Namespace: " + javaCommentEscape(thename.getNamespaceURI()));
         }
         emit(" * Java type: " + sType.getFullJavaName());
         emit(" *");
@@ -424,7 +424,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
 
     private void emitSpecializedAccessors(SchemaType sType) throws IOException {
         if (sType.getSimpleVariety() == SchemaType.ATOMIC &&
-            sType.getPrimitiveType().getBuiltinTypeCode() == SchemaType.BTC_DECIMAL) {
+                sType.getPrimitiveType().getBuiltinTypeCode() == SchemaType.BTC_DECIMAL) {
             int bits = sType.getDecimalSize();
             int parentBits = sType.getBaseType().getDecimalSize();
             if (bits != parentBits || sType.getBaseType().getFullJavaName() == null) {
@@ -504,13 +504,19 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
     void printJavaDocBody(String doc) throws IOException{
         // add some poor mans code injection protection
         // this is not protecting against annotation based RCEs like CVE-2018-16621
-        String docClean = doc.trim()
-            .replace("\t", "")
-            .replace("*/", "* /");
+        String docClean = javaCommentEscape(doc.trim().replace("\t", ""));
 
         for (String s : docClean.split("[\\n\\r]+")) {
             emit(" * " + s);
         }
+    }
+
+    public static String javaCommentEscape(String str)
+    {
+        // forbidden: */, and the backslash of a unicode escape - those are decoded
+        // before comments are recognized (JLS 3.3), so an escaped */ ends the
+        // comment too and the rest of the schema text is compiled as code
+        return str.replace("\\", "\\\\").replace("*/", "* /");
     }
 
     public static String javaStringEscape(String str)
@@ -533,9 +539,6 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         for (int i = 0; i < str.length(); i++) {
             char ch = str.charAt(i);
             switch (ch) {
-                default:
-                    sb.append(ch);
-                    break;
                 case '\n':
                     sb.append("\\n");
                     break;
@@ -547,6 +550,9 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
                     break;
                 case '\\':
                     sb.append("\\\\");
+                    break;
+                default:
+                    sb.append(ch);
                     break;
             }
         }
@@ -797,7 +803,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         boolean xmltype = (javaType == SchemaProperty.XML_OBJECT);
 
         if (prop.extendsJavaSingleton()) {
-            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && propertyDocumentation.length() > 0){
+            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && !propertyDocumentation.isEmpty()){
                 printJavaDocParagraph(propertyDocumentation);
             }else {
                 printJavaDoc((several ? "Gets first " : "Gets the ") + propdesc, BeanMethod.GET);
@@ -816,7 +822,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         }
 
         if (prop.extendsJavaOption()) {
-            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && propertyDocumentation.length() > 0){
+            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && !propertyDocumentation.isEmpty()){
                 printJavaDocParagraph(propertyDocumentation);
             }else {
                 printJavaDoc((several ? "True if has at least one " : "True if has ") + propdesc, BeanMethod.IS_SET);
@@ -825,7 +831,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         }
 
         if (several) {
-            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && propertyDocumentation.length() > 0){
+            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && !propertyDocumentation.isEmpty()){
                 printJavaDocParagraph(propertyDocumentation);
             }
 
@@ -836,14 +842,14 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
                 wrappedType = javaWrappedType(javaType);
             }
 
-            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && propertyDocumentation.length() > 0){
+            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && !propertyDocumentation.isEmpty()){
                 printJavaDocParagraph(propertyDocumentation);
             }else{
                 printJavaDoc("Gets a List of " + propdesc + "s", BeanMethod.GET_LIST);
             }
             emit("java.util.List<" + wrappedType + "> get" + propertyName + "List();", BeanMethod.GET_LIST);
 
-            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && propertyDocumentation.length() > 0){
+            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && !propertyDocumentation.isEmpty()){
                 printJavaDocParagraph(propertyDocumentation);
             }else{
                 printJavaDoc("Gets array of all " + propdesc + "s", BeanMethod.GET_ARRAY);
@@ -896,7 +902,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         String propdesc = "\"" + qName.getLocalPart() + "\"" + (isAttr ? " attribute" : " element");
 
         if (singleton) {
-            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && propertyDocumentation.length() > 0) {
+            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && !propertyDocumentation.isEmpty()) {
                 printJavaDocParagraph(propertyDocumentation);
             } else {
                 printJavaDoc((several ? "Sets first " : "Sets the ") + propdesc, BeanMethod.SET);
@@ -920,7 +926,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         }
 
         if (optional) {
-            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && propertyDocumentation.length() > 0) {
+            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && !propertyDocumentation.isEmpty()) {
                 printJavaDocParagraph(propertyDocumentation);
             } else {
                 printJavaDoc((several ? "Removes first " : "Unsets the ") + propdesc, BeanMethod.UNSET);
@@ -931,14 +937,14 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         if (several) {
             String arrayName = propertyName + "Array";
 
-            if(opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && propertyDocumentation.length() > 0) {
+            if(opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && !propertyDocumentation.isEmpty()) {
                 printJavaDocParagraph(propertyDocumentation);
             } else {
                 printJavaDoc("Sets array of all " + propdesc, BeanMethod.SET_ARRAY);
             }
             emit("void set" + arrayName + "(" + type + "[] " + safeVarName + "Array);", BeanMethod.SET_ARRAY);
 
-            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && propertyDocumentation.length() > 0) {
+            if (opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && !propertyDocumentation.isEmpty()) {
                 printJavaDocParagraph(propertyDocumentation);
             } else {
                 printJavaDoc("Sets ith " + propdesc, BeanMethod.SET_IDX);
@@ -1000,8 +1006,6 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
                 return "org.apache.xmlbeans.impl.values.JavaDoubleHolderEx";
             case SchemaType.BTC_DECIMAL:
                 switch (sType.getDecimalSize()) {
-                    default:
-                        assert (false);
                     case SchemaType.SIZE_BIG_DECIMAL:
                         return "org.apache.xmlbeans.impl.values.JavaDecimalHolderEx";
                     case SchemaType.SIZE_BIG_INTEGER:
@@ -1012,6 +1016,8 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
                     case SchemaType.SIZE_SHORT:
                     case SchemaType.SIZE_BYTE:
                         return "org.apache.xmlbeans.impl.values.JavaIntHolderEx";
+                    default:
+                        assert (false);
                 }
             case SchemaType.BTC_STRING:
                 if (sType.hasStringEnumValues()) {
@@ -1077,9 +1083,9 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         emit("public " + shortName + "(org.apache.xmlbeans.SchemaType sType) {");
         startBlock();
         emit("super(sType" + (sType.getSimpleVariety() == SchemaType.NOT_SIMPLE ?
-            "" :
-            ", " + !sType.isSimpleType()) +
-             ");");
+                "" :
+                ", " + !sType.isSimpleType()) +
+                ");");
         endBlock();
 
         if (sType.getSimpleVariety() != SchemaType.NOT_SIMPLE) {
@@ -1105,7 +1111,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         }
 
         emit("public " + (isInner ? "static " : "") + "class " + shortName +
-             " extends " + baseClass + " implements " + interfaces + " {");
+                " extends " + baseClass + " implements " + interfaces + " {");
 
         startBlock();
 
@@ -1140,7 +1146,6 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
             case SchemaProperty.JAVA_LONG:
                 return "0L";
 
-            default:
             case SchemaProperty.XML_OBJECT:
             case SchemaProperty.JAVA_BIG_DECIMAL:
             case SchemaProperty.JAVA_BIG_INTEGER:
@@ -1154,6 +1159,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
             case SchemaProperty.JAVA_CALENDAR:
             case SchemaProperty.JAVA_ENUM:
             case SchemaProperty.JAVA_OBJECT:
+            default:
                 return "null";
         }
     }
@@ -1415,16 +1421,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         emit(em.replace("#VARNAME#", safeVarName) + ";");
     }
 
-    String getIdentifier(Map<QName, Integer> qnameMap, QName qName) {
-        return "PROPERTY_QNAME[" + qnameMap.get(qName) + "]";
-    }
-
-    String getSetIdentifier(Map<QName, Integer> qnameMap, QName qName, Map<QName, Integer> qsetMap) {
-        Integer ord = qsetMap.get(qName);
-        return ord == null ? getIdentifier(qnameMap, qName) : "PROPERTY_QSET["+ ord + "]";
-    }
-
-    void printStaticFields(SchemaProperty[] properties, Map<QName, Integer> qnameMap, Map<QName, Integer> qsetMap) throws IOException {
+    void printStaticFields(SchemaProperty[] properties, Map<SchemaProperty, Identifier> propMap) throws IOException {
         if (properties.length == 0) {
             return;
         }
@@ -1435,8 +1432,8 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         indent();
         for (SchemaProperty prop : properties) {
             final QName name = prop.getName();
-            qnameMap.put(name, qnameMap.size());
-            emit("new QName(\"" + name.getNamespaceURI() + "\", \"" + name.getLocalPart() + "\"),");
+            propMap.put(prop, new Identifier(propMap.size()));
+            emit("new QName(\"" + javaStringEscape(name.getNamespaceURI()) + "\", \"" + javaStringEscape(name.getLocalPart()) + "\"),");
             countQSet = Math.max(countQSet, (prop.acceptedNames() == null ? 0 : prop.acceptedNames().length));
         }
         outdent();
@@ -1446,14 +1443,14 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         if (countQSet > 1) {
             emit("private static final QNameSet[] PROPERTY_QSET = {");
             for (SchemaProperty prop : properties) {
-                final QName name = prop.getName();
                 final QName[] qnames = prop.acceptedNames();
+                int index = 0;
                 if (qnames != null && qnames.length > 1) {
-                    qsetMap.put(name, qsetMap.size());
+                    propMap.get(prop).setSetIndex(index++);
                     emit("QNameSet.forArray( new QName[] { ");
                     indent();
                     for (QName qname : qnames) {
-                        emit("new QName(\"" + qname.getNamespaceURI() + "\", \"" + qname.getLocalPart() + "\"),");
+                        emit("new QName(\"" + javaStringEscape(qname.getNamespaceURI()) + "\", \"" + javaStringEscape(qname.getLocalPart()) + "\"),");
                     }
                     outdent();
                     emit("}),");
@@ -1475,7 +1472,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
     }
 
     void emitAddTarget(String identifier, boolean isAttr, String xtype)
-        throws IOException {
+            throws IOException {
         if (isAttr) {
             emit("target = (" + xtype + ")get_store().add_attribute_user(" + identifier + ");");
         } else {
@@ -1526,9 +1523,6 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
 
     String prePostOpString(int opType) {
         switch (opType) {
-            default:
-                assert false;
-
             case PrePostExtension.OPERATION_SET:
                 return "org.apache.xmlbeans.PrePostExtension.OPERATION_SET";
 
@@ -1537,6 +1531,9 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
 
             case PrePostExtension.OPERATION_REMOVE:
                 return "org.apache.xmlbeans.PrePostExtension.OPERATION_REMOVE";
+
+            default:
+                throw new IllegalArgumentException("Invalid opType: " + opType);
         }
     }
 
@@ -1550,7 +1547,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
                        String index,
                        int nullBehaviour,
                        String xtype)
-        throws IOException {
+            throws IOException {
         assert setIdentifier != null && identifier != null;
 
         emit(xtype + " target = null;");
@@ -1587,7 +1584,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
     }
 
     void printListGetterImpl(String propdesc, String propertyName, String wrappedType, boolean xmltype, boolean xget)
-    throws IOException {
+            throws IOException {
         Set<BeanMethod> bmList = (opt == null) ? null : opt.getCompilePartialMethod();
         if (bmList != null && !bmList.contains(xget ? BeanMethod.XGET_LIST : BeanMethod.GET_LIST)) {
             return;
@@ -1638,11 +1635,11 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         endBlock();
     }
 
-    void printGetterImpls(SchemaProperty prop, Map<QName, Integer> qnameMap, Map<QName, Integer> qsetMap)
-    throws IOException {
+    void printGetterImpls(SchemaProperty prop, Map<SchemaProperty, Identifier> propMap)
+            throws IOException {
         final QName qName = prop.getName();
-        final String identifier = getIdentifier(qnameMap, qName);
-        final String setIdentifier = getSetIdentifier(qnameMap, qName, qsetMap);
+        final String identifier = propMap.get(prop).getIdentifier();
+        final String setIdentifier = propMap.get(prop).getSetIdentifier();
         final boolean several = prop.extendsJavaArray();
         final boolean nillable = prop.hasNillable() != SchemaProperty.NEVER;
         final String type = javaTypeForProperty(prop);
@@ -1662,7 +1659,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         if (prop.extendsJavaSingleton()) {
             if (bmList == null || bmList.contains(BeanMethod.GET)) {
                 // Value getProp()
-                if(opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && propertyDocumentation.length() > 0){
+                if(opt.isCompileAnnotationAsJavadoc() && propertyDocumentation != null && !propertyDocumentation.isEmpty()){
                     printJavaDocParagraph(propertyDocumentation);
                 } else {
                     printJavaDoc((several ? "Gets first " : "Gets the ") + propdesc);
@@ -1677,7 +1674,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
                 emitGetTarget(setIdentifier, identifier, isAttr, "0", NOTHING, jtargetType);
 
                 if (isAttr && (prop.hasDefault() == SchemaProperty.CONSISTENTLY ||
-                               prop.hasFixed() == SchemaProperty.CONSISTENTLY)) {
+                        prop.hasFixed() == SchemaProperty.CONSISTENTLY)) {
                     emit("if (target == null) {");
                     startBlock();
                     makeAttributeDefaultValue(jtargetType, prop, identifier);
@@ -1685,7 +1682,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
                 }
 
                 emit("return (target == null) ? " + makeMissingValue(javaType) +
-                     " : " + printJGetValue(javaType, type, (SchemaTypeImpl) prop.getType()) + ";");
+                        " : " + printJGetValue(javaType, type, (SchemaTypeImpl) prop.getType()) + ";");
 
                 emitImplementationPostamble();
 
@@ -1704,7 +1701,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
                 emitGetTarget(setIdentifier, identifier, isAttr, "0", NOTHING, xtype);
 
                 if (isAttr && (prop.hasDefault() == SchemaProperty.CONSISTENTLY ||
-                               prop.hasFixed() == SchemaProperty.CONSISTENTLY)) {
+                        prop.hasFixed() == SchemaProperty.CONSISTENTLY)) {
                     emit("if (target == null) {");
                     startBlock();
                     makeAttributeDefaultValue(xtype, prop, identifier);
@@ -1859,11 +1856,11 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         }
     }
 
-    void printSetterImpls(SchemaProperty prop, Map<QName, Integer> qnameMap, Map<QName, Integer> qsetMap, SchemaType sType)
-    throws IOException {
+    void printSetterImpls(SchemaProperty prop, Map<SchemaProperty, Identifier> propMap, SchemaType sType)
+            throws IOException {
         final QName qName = prop.getName();
-        final String identifier = getIdentifier(qnameMap, qName);
-        final String setIdentifier = getSetIdentifier(qnameMap, qName, qsetMap);
+        final String identifier = propMap.get(prop).getIdentifier();
+        final String setIdentifier = propMap.get(prop).getSetIdentifier();
         final boolean several = prop.extendsJavaArray();
         final boolean nillable = prop.hasNillable() != SchemaProperty.NEVER;
         final String type = javaTypeForProperty(prop);
@@ -1895,7 +1892,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
                 if (xmltype && !isSubstGroup && !isAttr) {
                     emitPre(sType, PrePostExtension.OPERATION_SET, identifier, false, several ? "0" : "-1");
                     emit("generatedSetterHelperImpl(" + safeVarName + ", " + setIdentifier + ", 0, " +
-                         "org.apache.xmlbeans.impl.values.XmlObjectBase.KIND_SETTERHELPER_SINGLETON);");
+                            "org.apache.xmlbeans.impl.values.XmlObjectBase.KIND_SETTERHELPER_SINGLETON);");
                     emitPost(sType, PrePostExtension.OPERATION_SET, identifier, false, several ? "0" : "-1");
                 } else {
                     emitImplementationPreamble();
@@ -1985,7 +1982,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
 
             if (bmList == null || bmList.contains(BeanMethod.SET_ARRAY)) {
                 if (xmltype) {
-                    printJavaDoc("Sets array of all " + propdesc + "  WARNING: This method is not atomicaly synchronized.");
+                    printJavaDoc("Sets array of all " + propdesc + "  WARNING: This method is not atomically synchronized.");
                     if (!opt.isCompileNoAnnotations()) {
                         emit("@Override");
                     }
@@ -2034,13 +2031,13 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
                             emit("org.apache.xmlbeans.SimpleValue[] dests = arraySetterHelper(" + safeVarName + "Array.length" + ", " + identifier + ");");
                             emit("for ( int i = 0 ; i < dests.length ; i++ ) {");
                             emit("    " + getUserTypeStaticHandlerMethod(true, (SchemaTypeImpl) prop.getType())
-                                 + "(" + safeVarName + "Array[i], dests[i]);");
+                                    + "(" + safeVarName + "Array[i], dests[i]);");
                             emit("}");
                         } else {
                             emit("org.apache.xmlbeans.SimpleValue[] dests = arraySetterHelper(" + safeVarName + "Array.length" + ", " + identifier + ", " + setIdentifier + ");");
                             emit("for ( int i = 0 ; i < dests.length ; i++ ) {");
                             emit("    " + getUserTypeStaticHandlerMethod(true, (SchemaTypeImpl) prop.getType())
-                                 + "(" + safeVarName + "Array[i], dests[i]);");
+                                    + "(" + safeVarName + "Array[i], dests[i]);");
                             emit("}");
                         }
                     } else {
@@ -2067,7 +2064,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
                 if (xmltype && !isSubstGroup) {
                     emitPre(sType, PrePostExtension.OPERATION_SET, identifier, isAttr, "i");
                     emit("generatedSetterHelperImpl(" + safeVarName + ", " + setIdentifier + ", i, " +
-                         "org.apache.xmlbeans.impl.values.XmlObjectBase.KIND_SETTERHELPER_ARRAYITEM);");
+                            "org.apache.xmlbeans.impl.values.XmlObjectBase.KIND_SETTERHELPER_ARRAYITEM);");
                     emitPost(sType, PrePostExtension.OPERATION_SET, identifier, isAttr, "i");
                 } else {
                     emitImplementationPreamble();
@@ -2143,7 +2140,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
                 } else // This is a subst group case
                 {
                     emit("(" + jtargetType + ")get_store().insert_element_user(" + setIdentifier + ", " +
-                         identifier + ", i);");
+                            identifier + ", i);");
                 }
                 outdent();
                 printJSetValue(javaType, safeVarName, (SchemaTypeImpl) prop.getType());
@@ -2184,7 +2181,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
                 } else // This is a subst group case
                 {
                     emit("target = (" + xtype + ")get_store().insert_element_user(" +
-                         setIdentifier + ", " + identifier + ", i);");
+                            setIdentifier + ", " + identifier + ", i);");
                 }
                 emitPost(sType, PrePostExtension.OPERATION_INSERT, identifier, isAttr, "i");
                 emit("return target;");
@@ -2264,7 +2261,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
     }
 
     void printInnerTypeImpl(
-        SchemaType sType, SchemaTypeSystem system, boolean isInner) throws IOException {
+            SchemaType sType, SchemaTypeSystem system, boolean isInner) throws IOException {
         String shortName = sType.getShortJavaImplName();
 
         printInnerTypeJavaDoc(sType);
@@ -2277,15 +2274,14 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
 
         if (!sType.isSimpleType()) {
             SchemaProperty[] properties = getSchemaProperties(sType);
-            Map<QName, Integer> qnameMap = new HashMap<>();
-            Map<QName, Integer> qsetMap = new HashMap<>();
-            printStaticFields(properties, qnameMap, qsetMap);
+            Map<SchemaProperty, Identifier> propMap = new HashMap<>();
+            printStaticFields(properties, propMap);
 
             for (SchemaProperty prop : properties) {
-                printGetterImpls(prop, qnameMap, qsetMap);
+                printGetterImpls(prop, propMap);
 
                 if (!prop.isReadOnly()) {
-                    printSetterImpls(prop, qnameMap, qsetMap, sType);
+                    printSetterImpls(prop, propMap, sType);
                 }
             }
         }
@@ -2351,7 +2347,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         StringBuilder decl = new StringBuilder(60);
 
         decl.append("public ").append(method.getReturnType());
-        decl.append(" ").append(method.getName()).append("(");
+        decl.append(' ').append(method.getName()).append('(');
 
         // first parameter is always XmlObject, i.e. which is "this" and therefore doesn't need
         // to be in the method declaration of the type implementation
@@ -2361,10 +2357,10 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
             if (i > 1) {
                 decl.append(", ");
             }
-            decl.append(paramTypes[i]).append(" ").append(paramNames[i]);
+            decl.append(paramTypes[i]).append(' ').append(paramNames[i]);
         }
 
-        decl.append(")");
+        decl.append(')');
 
         String[] exceptions = method.getExceptionTypes();
         for (int i = 0; i < exceptions.length; i++) {
@@ -2398,7 +2394,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
 
     void printNestedTypeImpls(SchemaType sType, SchemaTypeSystem system) throws IOException {
         boolean redefinition = sType.getName() != null &&
-                               sType.getName().equals(sType.getBaseType().getName());
+                sType.getName().equals(sType.getBaseType().getName());
         while (sType != null) {
             SchemaType[] anonTypes = sType.getAnonymousTypes();
             for (SchemaType anonType : anonTypes) {
@@ -2411,7 +2407,7 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
             // For redefinition by extension, go ahead and print the anonymous
             // types in the base
             if (!redefinition ||
-                (sType.getDerivationType() != SchemaType.DT_EXTENSION && !sType.isSimpleType())) {
+                    (sType.getDerivationType() != SchemaType.DT_EXTENSION && !sType.isSimpleType())) {
                 break;
             }
             sType = sType.getBaseType();
@@ -2440,5 +2436,26 @@ public final class SchemaTypeCodePrinter implements SchemaCodePrinter {
         emit("}");
         outdent();
         emit("}");
+    }
+
+    private static class Identifier {
+        private final int getindex;
+        private Integer setindex = null;
+
+        private Identifier(int index) {
+            this.getindex = index;
+        }
+
+        public String getIdentifier() {
+            return "PROPERTY_QNAME[" + getindex + "]";
+        }
+
+        public String getSetIdentifier() {
+            return setindex == null ? getIdentifier() : "PROPERTY_QSET["+ setindex + "]";
+        }
+
+        public void setSetIndex(int setindex) {
+            this.setindex = setindex;
+        }
     }
 }

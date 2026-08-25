@@ -33,6 +33,7 @@ import org.xml.sax.ext.LexicalHandler;
 import javax.xml.namespace.QName;
 import javax.xml.stream.XMLStreamReader;
 import java.io.*;
+import java.nio.file.Files;
 import java.util.Collection;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -108,7 +109,7 @@ public final class Cursor implements XmlCursor, ChangeListener {
             throw new IllegalArgumentException("Name is null");
         }
 
-        if (name.length() == 0) {
+        if (name.isEmpty()) {
             throw new IllegalArgumentException("Name is empty");
         }
 
@@ -122,7 +123,7 @@ public final class Cursor implements XmlCursor, ChangeListener {
             throw new IllegalArgumentException("Prefix is null");
         }
 
-        if (name.length() == 0) {
+        if (name.isEmpty()) {
             throw new IllegalArgumentException("Prefix is empty");
         }
 
@@ -178,7 +179,7 @@ public final class Cursor implements XmlCursor, ChangeListener {
         assert isValid(that);
         assert isValid();
 
-        if (text != null && text.length() > 0) {
+        if (text != null && !text.isEmpty()) {
             that.next();
             that.insertString(text);
             that.toParent();
@@ -246,11 +247,11 @@ public final class Cursor implements XmlCursor, ChangeListener {
             case PROCINST: {
                 validatePrefix(name.getLocalPart());
 
-                if (name.getNamespaceURI().length() > 0) {
+                if (!name.getNamespaceURI().isEmpty()) {
                     throw new IllegalArgumentException("Procinst name must have no URI");
                 }
 
-                if (name.getPrefix().length() > 0) {
+                if (!name.getPrefix().isEmpty()) {
                     throw new IllegalArgumentException("Procinst name must have no prefix");
                 }
 
@@ -553,7 +554,7 @@ public final class Cursor implements XmlCursor, ChangeListener {
             throw new IllegalArgumentException("Null file specified");
         }
 
-        try (OutputStream os = new FileOutputStream(file)) {
+        try (OutputStream os = Files.newOutputStream(file.toPath())) {
             _save(os, options);
         }
     }
@@ -584,7 +585,7 @@ public final class Cursor implements XmlCursor, ChangeListener {
         }
 
         if (options != null && options.isSaveOptimizeForSpeed()) {
-            Saver.OptimizedForSpeedSaver.save(_cur, w); //ignore all other options
+            Saver.OptimizedForSpeedSaver.save(_cur, w, options); //ignore all other options bar attribute whitespace escaping
             return;
         }
 
@@ -789,7 +790,7 @@ public final class Cursor implements XmlCursor, ChangeListener {
     }
 
     public String _prefixForNamespace(String ns) {
-        if (ns == null || ns.length() == 0) {
+        if (ns == null || ns.isEmpty()) {
             throw new IllegalArgumentException("Must specify a namespace");
         }
 

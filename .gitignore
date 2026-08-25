@@ -1,2 +1,6 @@
-
+build/
+.gradle/
 lib/**/*.jar
+/bin
+gradle/wrapper/gradle-wrapper.jar
+

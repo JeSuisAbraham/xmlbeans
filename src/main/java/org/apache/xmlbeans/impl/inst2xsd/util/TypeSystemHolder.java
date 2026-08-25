@@ -177,7 +177,7 @@ public class TypeSystemHolder
         if (!element.isRef())
         {
             assert element.getName().getNamespaceURI().equals(tns) ||
-                element.getName().getNamespaceURI().length() == 0;
+                element.getName().getNamespaceURI().isEmpty();
             fillUpTypeOnElement(element.getType(), localSElement, tns);
             localSElement.setName(element.getName().getLocalPart());
         }
@@ -193,7 +193,7 @@ public class TypeSystemHolder
         }
         if (element.getMinOccurs()!=1)
         {
-            localSElement.setMinOccurs(new BigInteger("" + element.getMinOccurs()));
+            localSElement.setMinOccurs(BigInteger.valueOf(element.getMinOccurs()));
         }
 
         if (element.isNillable())
@@ -323,7 +323,7 @@ public class TypeSystemHolder
             {
                 explicitGroup = sComplexType.addNewChoice();
                 explicitGroup.setMaxOccurs("unbounded");
-                explicitGroup.setMinOccurs(new BigInteger("0"));
+                explicitGroup.setMinOccurs(BigInteger.ZERO);
             }
             else { throw new IllegalStateException("Unknown particle type in complex and mixed content"); }
 

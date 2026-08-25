@@ -17,13 +17,13 @@
 
 buildscript {
     repositories {
-        maven { url 'https://plugins.gradle.org/m2/' }
+        maven { url = 'https://plugins.gradle.org/m2/' }
         mavenCentral()
     }
 
     dependencies {
         classpath 'org.sonarsource.scanner.gradle:sonarqube-gradle-plugin:4.0.0.2929'
-        classpath 'de.thetaphi:forbiddenapis:3.4'
+        classpath 'de.thetaphi:forbiddenapis:3.10'
     }
 }
 
@@ -33,12 +33,13 @@ plugins {
     id 'idea'
     id 'maven-publish'
     id 'distribution'
-    id('org.nosphere.apache.rat') version '0.8.0'
-    id('de.thetaphi.forbiddenapis') version '3.4'
+    id('org.nosphere.apache.rat') version '0.8.1'
+    id('de.thetaphi.forbiddenapis') version '3.10'
     id 'jacoco'
-    id "com.github.spotbugs" version '5.0.12'
-    id 'org.cyclonedx.bom' version '1.7.4'
-    id 'ru.vyarus.animalsniffer' version '1.6.0'
+    id 'com.github.spotbugs' version '6.0.27'
+    id 'org.cyclonedx.bom' version '2.3.1'
+    id 'ru.vyarus.animalsniffer' version '1.7.2'
+    id 'com.adarshr.test-logger' version '4.0.0'
 }
 
 // Only add the plugin for Sonar if enabled
@@ -55,7 +56,6 @@ targetCompatibility = JavaVersion.VERSION_1_8
 
 repositories {
     mavenCentral()
-    maven { url 'https://repository.apache.org/content/repositories/releases' }
     //maven { url 'https://repository.apache.org/content/repositories/staging' }
 }
 
@@ -66,11 +66,12 @@ configurations {
 }
 
 ext {
-    antVersion = '1.10.13'
-    javaparserVersion = '3.25.0'
-    log4jVersion = '2.20.0'
-    saxonVersion = '11.5'
+    antVersion = '1.10.17'
+    javaparserVersion = '3.28.2'
+    log4jVersion = '2.26.1'
+    saxonVersion = '12.10'
     androidSdkMinimum = '26'
+    jdkVersion = (project.properties['jdkVersion'] ?: '8') as int
 }
 
 def testSchemas =  [
@@ -119,43 +120,38 @@ sourceSets {
 
 dependencies {
 
-    implementation "org.apache.logging.log4j:log4j-api:${log4jVersion}"
+    implementation platform("org.apache.logging.log4j:log4j-bom:${log4jVersion}")
+    implementation "org.apache.logging.log4j:log4j-api"
     implementation "net.sf.saxon:Saxon-HE:${saxonVersion}"
     implementation "org.apache.ant:ant:${antVersion}"
     implementation "com.github.javaparser:javaparser-core:${javaparserVersion}"
     implementation "com.github.javaparser:javaparser-symbol-solver-core:${javaparserVersion}"
 
-    // only for java 8
-    if (JavaVersion.current() == JavaVersion.VERSION_1_8) {
-        implementation 'xml-apis:xml-apis:1.4.01'
-    }
     // only necessary to compile against JDK8 internals - for Java9+ there's a multimodule implementation
     implementation 'com.sun.org.apache.xml.internal:resolver:20050927'
 
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.1'
-    testImplementation 'org.junit.jupiter:junit-jupiter-params:5.9.1'
-    testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.9.1'
-    testImplementation 'org.junit.platform:junit-platform-launcher:1.9.1'
+    // NOTE: newer JUnit breaks some tests for some reason
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.3'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params:5.10.3'
+    testImplementation 'org.junit.jupiter:junit-jupiter-engine:5.10.3'
+    testImplementation 'org.junit.platform:junit-platform-launcher:1.10.3'
+    testImplementation "commons-io:commons-io:2.21.0"
     testImplementation "org.apache.logging.log4j:log4j-core:${log4jVersion}"
 //    testImplementation "org.apache.ant:ant-junit:${antVersion}"
 //    testImplementation "org.apache.ant:ant-junit4:${antVersion}"
-    testImplementation 'org.hamcrest:hamcrest:2.2'
-    testImplementation('xerces:xercesImpl:2.12.2') {
-        if (JavaVersion.current() != JavaVersion.VERSION_1_8) {
-            exclude group: 'xml-apis', module: 'xml-apis'
-        }
-    }
-    testRuntimeOnly 'org.xmlresolver:xmlresolver:4.1.2'
+    testImplementation 'org.hamcrest:hamcrest:3.0'
+    testImplementation 'xerces:xercesImpl:2.12.2'
+    testRuntimeOnly 'org.xmlresolver:xmlresolver:5.2.5'
 
     // maven plugin dependencies
-    implementation('org.apache.maven:maven-core:3.8.4')
-    implementation 'org.apache.maven:maven-model:3.8.4'
-    implementation('org.apache.maven:maven-plugin-api:3.8.4')
-    implementation 'org.apache.maven.plugin-tools:maven-plugin-annotations:3.6.2'
+    implementation('org.apache.maven:maven-core:3.9.16')
+    implementation 'org.apache.maven:maven-model:3.9.16'
+    implementation('org.apache.maven:maven-plugin-api:3.9.16')
+    implementation 'org.apache.maven.plugin-tools:maven-plugin-annotations:3.15.2'
 
 
     // previous xmlbeans version is used to bootstrap necessary schema bindings
-    bootstrap 'org.apache.xmlbeans:xmlbeans:5.0.3'
+    bootstrap 'org.apache.xmlbeans:xmlbeans:5.3.0'
     bootstrap "org.apache.logging.log4j:log4j-core:${log4jVersion}"
 
     genresources "org.apache.logging.log4j:log4j-core:${log4jVersion}"
@@ -187,7 +183,7 @@ dependencies {
 }
 
 wrapper {
-    gradleVersion = '7.6'
+    gradleVersion = '8.14.5'
 }
 
 def extCP = files(configurations.testCompileClasspath + sourceSets.main.output.files + sourceSets.main.resources.srcDirs)
@@ -195,17 +191,6 @@ def scomp2CP = files(configurations.genresources + sourceSets.test.resources.src
 testSchemas.each {
     schemaGenTask(it.name, 'test', (it.name =~ /sEXT/ ? extCP : it.name =~ /sSCOMP2/ ? scomp2CP : configurations.genresources), it.dir, it.dependsOn, "${it.path}:${it.name}")
 }
-
-task adjustWrapperPropertiesFile {
-    doLast {
-        ant.replaceregexp(match:'^#.*', replace:'', flags:'g', byline:true) {
-            fileset(dir: project.projectDir, includes: 'gradle/wrapper/gradle-wrapper.properties')
-        }
-        new File(project.projectDir, 'gradle/wrapper/gradle-wrapper.properties').with { it.text = it.readLines().findAll { it }.sort().join('\n') }
-        ant.fixcrlf(file: 'gradle/wrapper/gradle-wrapper.properties', eol: 'lf')
-    }
-}
-wrapper.finalizedBy adjustWrapperPropertiesFile
 
 // https://discuss.gradle.org/t/passing-arguments-to-a-task/8427
 def schemaGenTask(String baseName, String mainTest, FileCollection beansPath, String xsdDir, String depends, String... xsdIncludes) {
@@ -298,7 +283,11 @@ javadoc {
             }
             addBooleanOption('Xdoclint:all,-missing', true)
             links 'https://poi.apache.org/apidocs/dev/'
-            links 'https://docs.oracle.com/javase/8/docs/api/'
+			if (JavaVersion.current().ordinal() >= JavaVersion.VERSION_23.ordinal()) {
+				links 'https://docs.oracle.com/en/java/javase/23/docs/api/'
+			} else {
+				links 'https://docs.oracle.com/javase/8/docs/api/'
+			}
             links 'https://xmlbeans.apache.org/docs/5.0.0/'
             source = "1.8"
         }
@@ -312,8 +301,10 @@ compileTestJava {
 
 task compileJava9(type: JavaCompile) {
     dependsOn 'compileJava'
-    onlyIf { JavaVersion.current() != JavaVersion.VERSION_1_8 }
 
+    javaCompiler = javaToolchains.compilerFor {
+        languageVersion = JavaLanguageVersion.of(Math.max(11, jdkVersion))
+    }
     sourceCompatibility = 9
     targetCompatibility = 9
     destinationDirectory = file('build/classes/java9/main/META-INF/versions/9')
@@ -324,16 +315,6 @@ task compileJava9(type: JavaCompile) {
         '--module-path',  files(sourceSets.main.output.files + configurations.java9.asFileTree.files).asPath
     ]
 }
-
-task cacheJava9(type: Copy) {
-    dependsOn 'compileJava9'
-    onlyIf { JavaVersion.current() != JavaVersion.VERSION_1_8 }
-
-    from(file('build/classes/java9/main/META-INF/versions/9'))
-    into('src/main/java9')
-}
-
-
 
 processTestResources {
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
@@ -362,13 +343,13 @@ idea {
 }
 
 jar {
-    dependsOn 'cacheJava9'
-
+    dependsOn compileJava9
     archiveBaseName = "xmlbeans-${XMLBeansVersion}"
 
     from(project.rootDir) {
         include 'NOTICE.txt'
         include 'LICENSE.txt'
+        into 'META-INF'
     }
 
     from('build/classes/java9/main')
@@ -377,13 +358,6 @@ jar {
         exclude '**/*.java'
         into 'META-INF/maven'
         filter { line -> line.replaceAll('@VERSION@', XMLBeansVersion) }
-    }
-
-    if (JavaVersion.current() == JavaVersion.VERSION_1_8) {
-        from('src/main/java9') {
-            include '**/*.class'
-            into 'META-INF/versions/9'
-        }
     }
 
     duplicatesStrategy = DuplicatesStrategy.INCLUDE
@@ -399,12 +373,6 @@ jar {
                 'Implementation-Version': XMLBeansVersion,
                 'Implementation-Vendor': 'org.apache.xmlbeans',
                 'Implementation-Vendor-Id': 'The Apache Software Foundation',
-                'Built-By': System.properties['user.name'],
-                'Build-Timestamp': new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").format(new Date()),
-                //'Build-Revision': versioning.info.commit,
-                'Created-By': "Gradle ${gradle.gradleVersion}",
-                'Build-Jdk': "${System.properties['java.version']} (${System.properties['java.vendor']} ${System.properties['java.vm.version']})",
-                'Build-OS': "${System.properties['os.name']} ${System.properties['os.arch']} ${System.properties['os.version']}"
         ], 'org/apache/xmlbeans/'
         )
     }
@@ -412,18 +380,47 @@ jar {
 
 javadocJar {
     archiveBaseName = "xmlbeans-${XMLBeansVersion}"
+    metaInf {
+        from("$projectDir/LICENSE.txt")
+        from("$projectDir/NOTICE.txt")
+    }
 }
 
 sourcesJar {
     archiveBaseName = "xmlbeans-${XMLBeansVersion}"
+    metaInf {
+        from("$projectDir/LICENSE.txt")
+        from("$projectDir/NOTICE.txt")
+    }
 }
 
 tasks.withType(GenerateModuleMetadata) {
     enabled = false
 }
 
+tasks.withType(AbstractArchiveTask).configureEach {
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
+}
+
+def buildInfoFile = layout.buildDirectory.file("buildinfo/xmlbeans-${XMLBeansVersion}.buildinfo")
+
+task writeBuildInfo(type: WriteProperties) {
+    outputFile = buildInfoFile
+    property 'Built-By', System.properties['user.name']
+    property 'Build-Timestamp', new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSZ").format(new Date())
+    property 'Created-By', "Gradle ${gradle.gradleVersion}"
+    property 'Build-Jdk', "${System.properties['java.version']}, (${System.properties['java.vendor']} ${System.properties['java.vm.version']})"
+    property 'Build-OS', "${System.properties['os.name']} ${System.properties['os.arch']} ${System.properties['os.version']}"
+}
+
+jar.dependsOn 'writeBuildInfo'
+
+def buildInfoArtifact = artifacts.add('genresources', buildInfoFile.get().asFile) {
+    type = 'buildinfo'
+}
+
 rat {
-    dependsOn 'cacheJava9'
 
     excludes = [
         'tmp',
@@ -444,7 +441,6 @@ rat {
         '**/zvon*.xml',
         '**/xmldsig-core-schema.xsd',
         'src/test/resources/xbean/xmlobject/japanese',
-        'src/test/resources/xbean/compile/scomp/j2ee',
         'src/test/resources/xbean/dom/W3C/level2/core/files',
         'src/test/resources/xbean/xmlobject/soap-envelope.xsd',
         'src/test/resources/xbean/xmlobject/soap12-encoding.xsd',
@@ -464,12 +460,12 @@ rat {
 distributions {
 
     def date = new Date().format('yyyyMMdd')
-    String root = "xmlbeans-${XMLBeansVersion}/"
+    String root = "apache-xmlbeans-${XMLBeansVersion}/"
 
     bin {
 
         // for this to work, project.version shouldn't be defined
-        distributionBaseName = "xmlbeans-bin-${XMLBeansVersion}-${date}"
+        distributionBaseName = "apache-xmlbeans-bin-${XMLBeansVersion}-${date}"
 
         contents {
             from('build/libs') {
@@ -507,7 +503,7 @@ distributions {
         }
     }
     src {
-        distributionBaseName = "xmlbeans-src-${XMLBeansVersion}-${date}"
+        distributionBaseName = "apache-xmlbeans-src-${XMLBeansVersion}-${date}"
         contents {
             from(".") {
                 exclude 'tmp'
@@ -541,11 +537,12 @@ distributions {
 publishing {
     publications {
         POI(MavenPublication) {
-            groupId 'org.apache.xmlbeans'
-            artifactId project.archivesBaseName
-            version XMLBeansVersion
+            groupId = 'org.apache.xmlbeans'
+            artifactId = project.archivesBaseName
+            version = XMLBeansVersion
 
             from components.java
+            artifact buildInfoArtifact
 
             pom {
                 packaging = 'jar'
@@ -615,7 +612,6 @@ generatePomFileForPOIPublication.destination = "build/dist/maven/${project.archi
 [binDistTar, binDistZip]*.dependsOn 'jar'
 [binDistTar, binDistZip]*.dependsOn 'export4anttest'
 [binDistTar, binDistZip]*.dependsOn 'cyclonedxBom'
-[srcDistTar, srcDistZip]*.dependsOn 'cacheJava9'
 [srcDistTar, srcDistZip]*.dependsOn 'cyclonedxBom'
 [srcDistTar, srcDistZip]*.dependsOn 'javadoc'
 
@@ -688,7 +684,7 @@ if (project.hasProperty('enableSonar')) {
 
 
 jacoco {
-    toolVersion = '0.8.8'
+    toolVersion = '0.8.14'
 }
 
 test {

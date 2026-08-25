@@ -33,6 +33,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Consumer;
 
+import static org.apache.xmlbeans.impl.util.StringUtil.equalsIgnoreCase;
+
 /**
  * This class represents the state of the SchemaTypeSystemCompiler as it's
  * going.
@@ -103,6 +105,7 @@ public class StscState {
     private boolean _noPvr;
     private boolean _noAnn;
     private boolean _mdefAll;
+    private String _sourceCodeEncoding ;
     private final Set<String> _mdefNamespaces = buildDefaultMdefNamespaces();
     private EntityResolver _entityResolver;
     private File _schemasDir;
@@ -427,14 +430,14 @@ public class StscState {
 
         try {
             URI uri = new URI(uriString);
-            if (uri.getScheme().equalsIgnoreCase("jar") ||
-                uri.getScheme().equalsIgnoreCase("zip")) {
+            if (equalsIgnoreCase(uri.getScheme(), "jar") ||
+                    equalsIgnoreCase(uri.getScheme(), "zip")) {
                 // It may be local or not, depending on the embedded URI
                 String s = uri.getSchemeSpecificPart();
                 int i = s.lastIndexOf('!');
                 return shouldDownloadURI(i > 0 ? s.substring(0, i) : s);
             }
-            return uri.getScheme().equalsIgnoreCase("file");
+            return equalsIgnoreCase(uri.getScheme(), "file");
         } catch (Exception e) {
             return false;
         }
@@ -459,6 +462,10 @@ public class StscState {
                  !"true".equals(SystemProperties.getProperty("xmlbean.schemaannotations", "true"));
         _doingDownloads = options.isCompileDownloadUrls() ||
                           "true".equals(SystemProperties.getProperty("xmlbean.downloadurls", "false"));
+        _sourceCodeEncoding = options.getCharacterEncoding();
+        if (_sourceCodeEncoding == null || _sourceCodeEncoding.isEmpty()) {
+            _sourceCodeEncoding = SystemProperties.getProperty("xmlbean.sourcecodeencoding");
+        }
         _entityResolver = options.getEntityResolver();
 
         if (_entityResolver == null) {
@@ -524,6 +531,14 @@ public class StscState {
     }
 
     /**
+     * An optional encoding to use when compiling generated java source file (can be <code>null</code>)
+     */
+    // EXPERIMENTAL
+    public String sourceCodeEncoding() {
+        return _sourceCodeEncoding ;
+    }
+
+    /**
      * Get count of recovered errors. Not for public.
      */
     // EXPERIMENTAL
@@ -539,7 +554,7 @@ public class StscState {
      */
     private QName compatName(QName name, String chameleonNamespace) {
         // first check for a chameleonNamespace namespace
-        if (name.getNamespaceURI().length() == 0 && chameleonNamespace != null && chameleonNamespace.length() > 0) {
+        if (name.getNamespaceURI().isEmpty() && chameleonNamespace != null && chameleonNamespace.length() > 0) {
             name = new QName(chameleonNamespace, name.getLocalPart());
         }
 
@@ -1151,7 +1166,7 @@ public class StscState {
     public static void end() {
         StscStack stscStack = tl_stscStack.get();
         stscStack.pop();
-        if (stscStack.stack.size() == 0) {
+        if (stscStack.stack.isEmpty()) {
             // this is required to release all the references in this classloader
             tl_stscStack.remove();
         }

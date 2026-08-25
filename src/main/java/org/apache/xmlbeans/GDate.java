@@ -16,6 +16,7 @@
 package org.apache.xmlbeans;
 
 import org.apache.xmlbeans.impl.util.ExceptionUtil;
+import org.apache.xmlbeans.impl.util.MathUtil;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -151,7 +152,11 @@ public final class GDate implements GDateSpecification, java.io.Serializable {
                         throw new IllegalArgumentException("year value starting with zero must be 4 or less digits: " + string);
                     }
 
-                    value = value * 10 + digitVal(ch);
+                    long newValue = value * 10L + digitVal(ch);
+                    if (newValue > Integer.MAX_VALUE) {
+                        throw new IllegalArgumentException("date value causes overflow: " + string);
+                    }
+                    value = Math.toIntExact(newValue);
                     start += 1;
                 }
                 digits += start;
@@ -270,13 +275,16 @@ public final class GDate implements GDateSpecification, java.io.Serializable {
                         }
                     }
                     try {
-                        fs = new BigDecimal(string.subSequence(start, len).toString());
+                        fs = MathUtil.parseAsBigDecimal(string.subSequence(start, len).toString());
                     } catch (Throwable e) {
                         if (ExceptionUtil.isFatal(e)) {
                             ExceptionUtil.rethrow(e);
                         }
                         throw new IllegalArgumentException();
                     }
+                } else {
+                    // a '.' must be followed by at least one fractional digit
+                    throw new IllegalArgumentException("fractional seconds must contain at least one digit");
                 }
             }
 

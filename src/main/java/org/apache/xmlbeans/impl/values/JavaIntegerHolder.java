@@ -21,6 +21,7 @@ import org.apache.xmlbeans.XmlErrorCodes;
 import org.apache.xmlbeans.XmlObject;
 import org.apache.xmlbeans.impl.common.ValidationContext;
 import org.apache.xmlbeans.impl.schema.BuiltinSchemaTypeSystem;
+import org.apache.xmlbeans.impl.util.MathUtil;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -44,12 +45,12 @@ public abstract class JavaIntegerHolder extends XmlObjectBase {
     }
 
     public static BigInteger lex(String s, ValidationContext vc) {
-        if (s.length() > 0 && s.charAt(0) == '+') {
+        if (!s.isEmpty() && s.charAt(0) == '+') {
             s = s.substring(1);
         }
 
         try {
-            return new BigInteger(s);
+            return MathUtil.parseAsBigInteger(s);
         } catch (Exception e) {
             vc.invalid(XmlErrorCodes.INTEGER, new Object[]{s});
             return null;
@@ -73,7 +74,7 @@ public abstract class JavaIntegerHolder extends XmlObjectBase {
 
     // setters
     protected void set_BigDecimal(BigDecimal v) {
-        _value = v.toBigInteger();
+        _value = MathUtil.toBigInteger(v);
     }
 
     protected void set_BigInteger(BigInteger v) {

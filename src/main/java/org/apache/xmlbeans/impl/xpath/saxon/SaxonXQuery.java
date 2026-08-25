@@ -20,6 +20,7 @@ import net.sf.saxon.dom.DocumentWrapper;
 import net.sf.saxon.dom.NodeOverNodeInfo;
 import net.sf.saxon.ma.map.HashTrieMap;
 import net.sf.saxon.om.Item;
+import net.sf.saxon.om.NamespaceUri;
 import net.sf.saxon.om.NodeInfo;
 import net.sf.saxon.om.StructuredQName;
 import net.sf.saxon.query.DynamicQueryContext;
@@ -28,9 +29,9 @@ import net.sf.saxon.query.XQueryExpression;
 import net.sf.saxon.str.StringView;
 import net.sf.saxon.type.BuiltInAtomicType;
 import net.sf.saxon.value.*;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.xmlbeans.*;
+import org.apache.xmlbeans.impl.logging.XmlBeansLogManager;
 import org.apache.xmlbeans.impl.store.Cur;
 import org.apache.xmlbeans.impl.store.Cursor;
 import org.apache.xmlbeans.impl.store.Locale;
@@ -53,7 +54,7 @@ import java.util.ListIterator;
 import java.util.Map;
 
 public class SaxonXQuery implements XQuery {
-    private static final Logger LOG = LogManager.getLogger(SaxonXQuery.class);
+    private static final Logger LOG = XmlBeansLogManager.getLogger(SaxonXQuery.class);
 
     private final XQueryExpression xquery;
     private final String contextVar;
@@ -81,7 +82,9 @@ public class SaxonXQuery implements XQuery {
         StaticQueryContext sc = config.newStaticQueryContext();
         Map<String, String> nsMap = xmlOptions.getLoadAdditionalNamespaces();
         if (nsMap != null) {
-            nsMap.forEach(sc::declareNamespace);
+            for (Map.Entry<String, String> entry : nsMap.entrySet()) {
+                sc.declareNamespace(entry.getKey(), NamespaceUri.of(entry.getValue()));
+            }
         }
         this.contextVar = contextVar;
         //Saxon requires external variables at the end of the prolog...
@@ -176,13 +179,14 @@ public class SaxonXQuery implements XQuery {
             DocumentWrapper docWrapper = new DocumentWrapper(dom, null, config);
             NodeInfo root = docWrapper.wrap(contextNode);
 
+            NamespaceUri emptyUri = NamespaceUri.of("");
             DynamicQueryContext dc = new DynamicQueryContext(config);
             dc.setContextItem(root);
-            dc.setParameter(new StructuredQName("", null, contextVar), root);
+            dc.setParameter(new StructuredQName("", emptyUri, contextVar), root);
             // Set the other variables
             if (variableBindings != null) {
                 for (Map.Entry<String, Object> me : variableBindings.entrySet()) {
-                    StructuredQName key = new StructuredQName("", null, me.getKey());
+                    StructuredQName key = new StructuredQName("", emptyUri, me.getKey());
                     Object value = me.getValue();
                     if (value instanceof XmlTokenSource) {
                         Node paramObject = ((XmlTokenSource) value).getDomNode();
@@ -282,7 +286,7 @@ public class SaxonXQuery implements XQuery {
             }
         } else if (value instanceof QName) {
             QName q = (QName) value;
-            return new QNameValue(q.getPrefix(), q.getNamespaceURI(), q.getLocalPart()); //BuiltInAtomicType.QNAME, null);
+            return new QNameValue(q.getPrefix(), NamespaceUri.of(q.getNamespaceURI()), q.getLocalPart()); //BuiltInAtomicType.QNAME, null);
         } else if (value instanceof URI) {
             return new AnyURIValue(value.toString());
         } else if (value instanceof Map) {

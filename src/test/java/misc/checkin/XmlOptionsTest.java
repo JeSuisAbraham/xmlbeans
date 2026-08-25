@@ -17,6 +17,7 @@ package misc.checkin;
 import org.apache.xmlbeans.XmlOptions;
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -30,4 +31,48 @@ public class XmlOptionsTest {
         xmlOptions.setUnsynchronized(false);
         assertFalse(xmlOptions.isUnsynchronized());
     }
+
+    @Test
+    void testLoadStrictFloatingPointFlag() {
+        XmlOptions xmlOptions = new XmlOptions();
+        assertFalse(xmlOptions.isLoadStrictFloatingPoint());
+        xmlOptions.setLoadStrictFloatingPoint();
+        assertTrue(xmlOptions.isLoadStrictFloatingPoint());
+        xmlOptions.setLoadStrictFloatingPoint(false);
+        assertFalse(xmlOptions.isLoadStrictFloatingPoint());
+    }
+
+    @Test
+    void testLoadAllowDecimalExponentFlag() {
+        XmlOptions xmlOptions = new XmlOptions();
+        assertFalse(xmlOptions.isLoadAllowDecimalExponent());
+        xmlOptions.setLoadAllowDecimalExponent();
+        assertTrue(xmlOptions.isLoadAllowDecimalExponent());
+        xmlOptions.setLoadAllowDecimalExponent(false);
+        assertFalse(xmlOptions.isLoadAllowDecimalExponent());
+    }
+
+    @Test
+    void testSaveNoAttributeWhitespaceEscapeFlag() {
+        XmlOptions xmlOptions = new XmlOptions();
+        assertFalse(xmlOptions.isSaveNoAttributeWhitespaceEscape());
+        xmlOptions.setSaveNoAttributeWhitespaceEscape();
+        assertTrue(xmlOptions.isSaveNoAttributeWhitespaceEscape());
+        xmlOptions.setSaveNoAttributeWhitespaceEscape(false);
+        assertFalse(xmlOptions.isSaveNoAttributeWhitespaceEscape());
+    }
+
+    @Test
+    void testMaxNumberOfCharsForNumbers() {
+        XmlOptions xmlOptions = new XmlOptions();
+        assertEquals(XmlOptions.DEFAULT_MAX_NUMBER_CHARS,
+                xmlOptions.getMaxNumberOfCharsForNumbers());
+        xmlOptions.setMaxNumberOfCharsForNumbers(2);
+        assertEquals(2, xmlOptions.getMaxNumberOfCharsForNumbers());
+        xmlOptions.setMaxNumberOfCharsForNumbers(Integer.valueOf(3));
+        assertEquals(3, xmlOptions.getMaxNumberOfCharsForNumbers());
+        xmlOptions.setMaxNumberOfCharsForNumbers(null);
+        assertEquals(XmlOptions.DEFAULT_MAX_NUMBER_CHARS, xmlOptions.getMaxNumberOfCharsForNumbers());
+    }
+
 }

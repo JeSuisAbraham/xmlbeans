@@ -20,6 +20,7 @@ import org.apache.xmlbeans.impl.common.*;
 import org.apache.xmlbeans.impl.schema.SchemaTypeImpl;
 import org.apache.xmlbeans.impl.schema.SchemaTypeVisitorImpl;
 import org.apache.xmlbeans.impl.util.ExceptionUtil;
+import org.apache.xmlbeans.impl.util.MathUtil;
 import org.apache.xmlbeans.impl.util.XsTypeConverter;
 import org.apache.xmlbeans.impl.values.*;
 
@@ -34,10 +35,10 @@ public final class Validator
     public Validator(
         SchemaType type, SchemaField field, SchemaTypeLoader globalLoader,
         XmlOptions options, Collection<XmlError> defaultErrorListener) {
-        options = XmlOptions.maskNull(options);
-        _errorListener = options.getErrorListener();
-        _treatLaxAsSkip = options.isValidateTreatLaxAsSkip();
-        _strict = options.isValidateStrict();
+        _options = XmlOptions.maskNull(options);
+        _errorListener = _options.getErrorListener();
+        _treatLaxAsSkip = _options.isValidateTreatLaxAsSkip();
+        _strict = _options.isValidateStrict();
 
         if (_errorListener == null) {
             _errorListener = defaultErrorListener;
@@ -755,9 +756,9 @@ public final class Validator
             }
         }
 
-        List<QName> names = (expectedNames.size() > 0 ? expectedNames : optionalNames);
+        List<QName> names = expectedNames.isEmpty() ? optionalNames : expectedNames;
 
-        if (names.size() > 0) {
+        if (!names.isEmpty()) {
             String buf = names.stream().map(QNameHelper::pretty).collect(Collectors.joining(" "));
             emitFieldError(event, XmlErrorCodes.ELEM_COMPLEX_TYPE_LOCALLY_VALID$EXPECTED_DIFFERENT_ELEMENT,
                 new Object[]{names.size(), buf, QNameHelper.pretty(qName)},
@@ -787,9 +788,9 @@ public final class Validator
             }
         }
 
-        List<QName> names = (expectedNames.size() > 0 ? expectedNames : optionalNames);
+        List<QName> names = expectedNames.isEmpty() ? optionalNames : expectedNames;
 
-        if (names.size() > 0) {
+        if (!names.isEmpty()) {
             String buf = names.stream().map(QNameHelper::pretty).collect(Collectors.joining(" "));
 
             emitFieldError(event, XmlErrorCodes.ELEM_COMPLEX_TYPE_LOCALLY_VALID$MISSING_ELEMENT,
@@ -976,7 +977,7 @@ public final class Validator
 
         // See if I can apply a default/fixed value
 
-        if (value.length() == 0 && canApplyDefault && field != null &&
+        if (value.isEmpty() && canApplyDefault && field != null &&
             (field.isDefault() || field.isFixed())) {
             if (XmlQName.type.isAssignableFrom(type)) {
                 // TODO: will be fixed in XmlSchema 1.1
@@ -1098,7 +1099,8 @@ public final class Validator
                 break;
             }
             case SchemaType.BTC_DECIMAL: {
-                JavaDecimalHolderEx.validateLexical(value, type, _vc);
+                JavaDecimalHolderEx.validateLexical(value, type, _vc,
+                        false, _options.getMaxNumberOfCharsForNumbers());
 
                 // An additional rule states that if the type is xs:integer or derived from it,
                 // then the decimal dot is not allowed.
@@ -1108,7 +1110,7 @@ public final class Validator
                 }
 
                 if (errorState == _errorState) {
-                    _decimalValue = new BigDecimal(value);
+                    _decimalValue = MathUtil.parseAsBigDecimal(value, _options.getMaxNumberOfCharsForNumbers());
                     JavaDecimalHolderEx.validateValue(_decimalValue, type, _vc);
                 }
 
@@ -1120,7 +1122,7 @@ public final class Validator
             }
             case SchemaType.BTC_FLOAT: {
                 float f =
-                    JavaFloatHolderEx.validateLexical(value, type, _vc);
+                    JavaFloatHolderEx.validateLexical(value, type, _vc, _options.getMaxNumberOfCharsForNumbers());
 
                 if (errorState == _errorState) {
                     JavaFloatHolderEx.validateValue(f, type, _vc);
@@ -1131,7 +1133,7 @@ public final class Validator
             }
             case SchemaType.BTC_DOUBLE: {
                 double d =
-                    JavaDoubleHolderEx.validateLexical(value, type, _vc);
+                    JavaDoubleHolderEx.validateLexical(value, type, _vc, _options.getMaxNumberOfCharsForNumbers());
 
                 if (errorState == _errorState) {
                     JavaDoubleHolderEx.validateValue(d, type, _vc);
@@ -1497,6 +1499,7 @@ public final class Validator
     // Members of the validator class
     //
 
+    private final XmlOptions _options;
     private boolean _invalid;
     private final SchemaType _rootType;
     private final SchemaField _rootField;

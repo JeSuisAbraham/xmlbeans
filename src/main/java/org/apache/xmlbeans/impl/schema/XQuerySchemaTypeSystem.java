@@ -17,6 +17,7 @@ package org.apache.xmlbeans.impl.schema;
 
 import org.apache.xmlbeans.*;
 import org.apache.xmlbeans.impl.common.QNameHelper;
+import org.apache.xmlbeans.impl.util.MathUtil;
 import org.apache.xmlbeans.impl.values.XmlIntegerImpl;
 import org.apache.xmlbeans.impl.values.XmlStringImpl;
 import org.apache.xmlbeans.impl.values.XmlValueOutOfRangeException;
@@ -185,7 +186,7 @@ public class XQuerySchemaTypeSystem extends SchemaTypeLoaderBase implements
             build_wsstring(SchemaType.WS_COLLAPSE), null, null};
 
     private final static XmlValueRef[] FACETS_UNSIGNED_LONG = new XmlValueRef[]
-        {null, null, null, null, buildInteger(BigInteger.ZERO), buildInteger(new BigInteger("18446744073709551615")), null, null, buildNnInteger(BigInteger.ZERO),
+        {null, null, null, null, buildInteger(BigInteger.ZERO), buildInteger(MathUtil.parseAsBigInteger("18446744073709551615")), null, null, buildNnInteger(BigInteger.ZERO),
             build_wsstring(SchemaType.WS_COLLAPSE), null, null};
 
     private final static XmlValueRef[] FACETS_UNSIGNED_INT = new XmlValueRef[]
@@ -570,7 +571,7 @@ public class XQuerySchemaTypeSystem extends SchemaTypeLoaderBase implements
      */
     public void fillInType(int btc) {
         SchemaTypeImpl result = getBuiltinType(btc);
-        SchemaType base;
+        SchemaType base = null;
         SchemaType item = null;
         int variety = SchemaType.ATOMIC;
         int derivationType = SchemaType.DT_RESTRICTION;
@@ -586,9 +587,6 @@ public class XQuerySchemaTypeSystem extends SchemaTypeLoaderBase implements
                 base = null;
                 derivationType = SchemaType.DT_RESTRICTION;
                 break;
-
-            default:
-                assert (false);
 
             case SchemaType.BTC_ANY_SIMPLE:
                 base = ST_ANY_TYPE;
@@ -721,6 +719,8 @@ public class XQuerySchemaTypeSystem extends SchemaTypeLoaderBase implements
                 base = ST_DURATION;
                 break;
 
+            default:
+                assert (false);
         }
 
         result.setDerivationType(derivationType);
@@ -746,16 +746,13 @@ public class XQuerySchemaTypeSystem extends SchemaTypeLoaderBase implements
             result.setPrimitiveTypeRef(base.getPrimitiveType().getRef());
         }
 
-        XmlValueRef[] facets;
-        boolean[] fixedf;
+        XmlValueRef[] facets = null;
+        boolean[] fixedf = null;
         int wsr = SchemaType.WS_COLLAPSE;
         int decimalSize = SchemaType.NOT_DECIMAL;
 
         // now set up facets
         switch (btc) {
-            default:
-                assert (false);
-
             case SchemaType.BTC_ANY_TYPE:
             case SchemaType.BTC_ANY_SIMPLE:
             case SchemaType.BTC_NOT_BUILTIN:
@@ -913,6 +910,8 @@ public class XQuerySchemaTypeSystem extends SchemaTypeLoaderBase implements
                 wsr = SchemaType.WS_COLLAPSE;
                 break;
 
+            default:
+                assert (false);
         }
 
         // fundamental facets
@@ -922,9 +921,6 @@ public class XQuerySchemaTypeSystem extends SchemaTypeLoaderBase implements
         boolean isBounded = false;
 
         switch (btc) {
-            default:
-                assert (false);
-
             case SchemaType.BTC_ANY_TYPE:
             case SchemaType.BTC_NOT_BUILTIN:
             case SchemaType.BTC_ANY_SIMPLE:
@@ -993,6 +989,9 @@ public class XQuerySchemaTypeSystem extends SchemaTypeLoaderBase implements
                 isFinite = true;
                 isBounded = true;
                 break;
+
+            default:
+                assert (false);
         }
 
         result.setBasicFacets(facets, fixedf);
@@ -1069,7 +1068,7 @@ public class XQuerySchemaTypeSystem extends SchemaTypeLoaderBase implements
             attrModel.setWildcardSet(QNameSet.ALL);
 
             result.setComplexTypeVariety(SchemaType.MIXED_CONTENT);
-            result.setContentModel(contentModel, attrModel, Collections.EMPTY_MAP, Collections.EMPTY_MAP, false);
+            result.setContentModel(contentModel, attrModel, Collections.emptyMap(), Collections.emptyMap(), false);
             result.setAnonymousTypeRefs(EMPTY_SCHEMATYPEREF_ARRAY);
             result.setWildcardSummary(QNameSet.ALL, true, QNameSet.ALL, true);
         } else if (btc == SchemaType.BTC_NOT_BUILTIN) {
@@ -1077,7 +1076,7 @@ public class XQuerySchemaTypeSystem extends SchemaTypeLoaderBase implements
             SchemaParticleImpl contentModel = null; // empty
             SchemaAttributeModelImpl attrModel = new SchemaAttributeModelImpl(); // empty
             result.setComplexTypeVariety(SchemaType.EMPTY_CONTENT);
-            result.setContentModel(contentModel, attrModel, Collections.EMPTY_MAP, Collections.EMPTY_MAP, false);
+            result.setContentModel(contentModel, attrModel, Collections.emptyMap(), Collections.emptyMap(), false);
             result.setAnonymousTypeRefs(EMPTY_SCHEMATYPEREF_ARRAY);
             result.setWildcardSummary(QNameSet.EMPTY, false, QNameSet.EMPTY, false);
         }

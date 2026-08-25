@@ -17,6 +17,7 @@ package org.apache.xmlbeans.impl.schema;
 
 import org.apache.xmlbeans.*;
 import org.apache.xmlbeans.impl.common.QNameHelper;
+import org.apache.xmlbeans.impl.util.MathUtil;
 import org.apache.xmlbeans.impl.values.XmlIntegerImpl;
 import org.apache.xmlbeans.impl.values.XmlStringImpl;
 import org.apache.xmlbeans.impl.values.XmlValueOutOfRangeException;
@@ -44,7 +45,7 @@ public class BuiltinSchemaTypeSystem extends SchemaTypeLoaderBase implements Sch
     private static final SchemaAttributeGroup[] EMPTY_SCHEMAATTRIBUTEGROUP_ARRAY = new SchemaAttributeGroup[0];
     private static final SchemaAnnotation[] EMPTY_SCHEMAANNOTATION_ARRAY = new SchemaAnnotation[0];
 
-    private static BuiltinSchemaTypeSystem _global = new BuiltinSchemaTypeSystem();
+    private static final BuiltinSchemaTypeSystem _global = new BuiltinSchemaTypeSystem();
 
     // UR types
     public static final SchemaTypeImpl ST_ANY_TYPE = _global.getBuiltinType(SchemaType.BTC_ANY_TYPE);
@@ -165,7 +166,7 @@ public class BuiltinSchemaTypeSystem extends SchemaTypeLoaderBase implements Sch
           build_wsstring(SchemaType.WS_COLLAPSE), null, null };
 
     private final static XmlValueRef[] FACETS_UNSIGNED_LONG = new XmlValueRef[]
-        { null, null, null, null, buildInteger(BigInteger.ZERO), buildInteger(new BigInteger("18446744073709551615")), null, null, buildNnInteger(BigInteger.ZERO),
+        { null, null, null, null, buildInteger(BigInteger.ZERO), buildInteger(MathUtil.parseAsBigInteger("18446744073709551615")), null, null, buildNnInteger(BigInteger.ZERO),
           build_wsstring(SchemaType.WS_COLLAPSE), null, null };
 
     private final static XmlValueRef[] FACETS_UNSIGNED_INT = new XmlValueRef[]
@@ -209,12 +210,12 @@ public class BuiltinSchemaTypeSystem extends SchemaTypeLoaderBase implements Sch
         }
     }
 
-    private Map<QName, SchemaType> _typeMap = new HashMap<>();
-    private SchemaTypeImpl[] _typeArray = new SchemaTypeImpl[SchemaType.BTC_LAST_BUILTIN + 1];
-    private Map<String, SchemaType> _handlesToObjects = new HashMap<>();
-    private Map<SchemaType, String> _objectsToHandles = new HashMap<>();
-    private Map<String, SchemaType> _typesByClassname = new HashMap<>();
-    private SchemaContainer _container = new SchemaContainer("http://www.w3.org/2001/XMLSchema");
+    private final Map<QName, SchemaType> _typeMap = new HashMap<>();
+    private final SchemaTypeImpl[] _typeArray = new SchemaTypeImpl[SchemaType.BTC_LAST_BUILTIN + 1];
+    private final Map<String, SchemaType> _handlesToObjects = new HashMap<>();
+    private final Map<SchemaType, String> _objectsToHandles = new HashMap<>();
+    private final Map<String, SchemaType> _typesByClassname = new HashMap<>();
+    private final SchemaContainer _container = new SchemaContainer("http://www.w3.org/2001/XMLSchema");
 
     private SchemaTypeImpl getBuiltinType(int btc)
     {
@@ -578,7 +579,7 @@ public class BuiltinSchemaTypeSystem extends SchemaTypeLoaderBase implements Sch
     public void fillInType(int btc)
     {
         SchemaTypeImpl result = getBuiltinType(btc);
-        SchemaType base;
+        SchemaType base = null;
         SchemaType item = null;
         int variety = SchemaType.ATOMIC;
         int derivationType = SchemaType.DT_RESTRICTION;
@@ -595,9 +596,6 @@ public class BuiltinSchemaTypeSystem extends SchemaTypeLoaderBase implements Sch
                 base = null;
                 derivationType = SchemaType.DT_RESTRICTION;
                 break;
-
-            default:
-                assert(false);
 
             case SchemaType.BTC_ANY_SIMPLE:
                 base = ST_ANY_TYPE; break;
@@ -697,6 +695,9 @@ public class BuiltinSchemaTypeSystem extends SchemaTypeLoaderBase implements Sch
                 else
                     item = ST_NMTOKEN;
                 break;
+
+            default:
+                assert(false);
         }
 
         result.setDerivationType(derivationType);
@@ -723,17 +724,14 @@ public class BuiltinSchemaTypeSystem extends SchemaTypeLoaderBase implements Sch
             result.setPrimitiveTypeRef(base.getPrimitiveType().getRef());
         }
 
-        XmlValueRef[] facets;
-        boolean[] fixedf;
+        XmlValueRef[] facets = null;
+        boolean[] fixedf = null;
         int wsr = SchemaType.WS_COLLAPSE;
         int decimalSize = SchemaType.NOT_DECIMAL;
 
         // now set up facets
         switch (btc)
         {
-            default:
-                assert(false);
-
             case SchemaType.BTC_ANY_TYPE:
             case SchemaType.BTC_ANY_SIMPLE:
             case SchemaType.BTC_NOT_BUILTIN:
@@ -882,6 +880,10 @@ public class BuiltinSchemaTypeSystem extends SchemaTypeLoaderBase implements Sch
                 fixedf = FIXED_FACETS_NONE;
                 wsr = SchemaType.WS_UNSPECIFIED;
                 break;
+
+            default:
+                assert(false);
+
         }
 
         // fundamental facets
@@ -892,9 +894,6 @@ public class BuiltinSchemaTypeSystem extends SchemaTypeLoaderBase implements Sch
 
         switch (btc)
         {
-            default:
-                assert(false);
-
             case SchemaType.BTC_ANY_TYPE:
             case SchemaType.BTC_NOT_BUILTIN:
             case SchemaType.BTC_ANY_SIMPLE:
@@ -960,6 +959,9 @@ public class BuiltinSchemaTypeSystem extends SchemaTypeLoaderBase implements Sch
                 isFinite = true;
                 isBounded = true;
                 break;
+
+            default:
+                assert(false);
         }
 
         result.setBasicFacets(facets, fixedf);
@@ -1030,7 +1032,7 @@ public class BuiltinSchemaTypeSystem extends SchemaTypeLoaderBase implements Sch
             attrModel.setWildcardSet(QNameSet.ALL);
 
             result.setComplexTypeVariety(SchemaType.MIXED_CONTENT);
-            result.setContentModel(contentModel, attrModel, Collections.EMPTY_MAP, Collections.EMPTY_MAP, false);
+            result.setContentModel(contentModel, attrModel, Collections.emptyMap(), Collections.emptyMap(), false);
             result.setAnonymousTypeRefs(EMPTY_SCHEMATYPEREF_ARRAY);
             result.setWildcardSummary(QNameSet.ALL, true, QNameSet.ALL, true);
         }
@@ -1040,7 +1042,7 @@ public class BuiltinSchemaTypeSystem extends SchemaTypeLoaderBase implements Sch
             SchemaParticleImpl contentModel = null; // empty
             SchemaAttributeModelImpl attrModel = new SchemaAttributeModelImpl(); // empty
             result.setComplexTypeVariety(SchemaType.EMPTY_CONTENT);
-            result.setContentModel(contentModel, attrModel, Collections.EMPTY_MAP, Collections.EMPTY_MAP, false);
+            result.setContentModel(contentModel, attrModel, Collections.emptyMap(), Collections.emptyMap(), false);
             result.setAnonymousTypeRefs(EMPTY_SCHEMATYPEREF_ARRAY);
             result.setWildcardSummary(QNameSet.EMPTY, false, QNameSet.EMPTY, false);
         }

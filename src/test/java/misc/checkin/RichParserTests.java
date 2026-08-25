@@ -16,6 +16,7 @@
 package misc.checkin;
 
 import org.apache.xmlbeans.*;
+import org.apache.xmlbeans.impl.common.InvalidLexicalValueException;
 import org.apache.xmlbeans.impl.richParser.XMLStreamReaderExt;
 import org.apache.xmlbeans.impl.richParser.XMLStreamReaderExtImpl;
 import org.junit.jupiter.api.Test;
@@ -27,15 +28,16 @@ import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import javax.xml.stream.events.XMLEvent;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.file.Files;
 import java.util.Calendar;
 import java.util.Date;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 
 /**
@@ -45,8 +47,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class RichParserTests {
     @Test
     void testPrimitiveTypes() throws Exception {
-        XMLStreamReader xsr = XmlObject.Factory.parse(new FileInputStream(
-                JarUtil.getResourceFromJarasFile("xbean/misc/primitiveTypes.xml"))).
+        XMLStreamReader xsr = XmlObject.Factory.parse(Files.newInputStream(
+                JarUtil.getResourceFromJarasFile("xbean/misc/primitiveTypes.xml").toPath())).
             newXMLStreamReader();
         XMLStreamReaderExt xsrext = new XMLStreamReaderExtImpl(xsr);
 
@@ -64,6 +66,87 @@ public class RichParserTests {
                     break;
             }
         }
+    }
+
+    @Test
+    void testInvalidBase64ThrowsInvalidLexicalValue() throws Exception {
+        // "A" is a single base64 char, the MIME decoder rejects it with
+        // IllegalArgumentException. The rich parser must surface that as the
+        // documented InvalidLexicalValueException, like the other getters.
+        XMLStreamReaderExt elem = atFirstStartElement("<a>A</a>");
+        assertThrows(InvalidLexicalValueException.class, elem::getBase64Value);
+
+        XMLStreamReaderExt attByIndex = atFirstStartElement("<a b=\"A\"/>");
+        assertThrows(InvalidLexicalValueException.class, () -> attByIndex.getAttributeBase64Value(0));
+
+        XMLStreamReaderExt attByName = atFirstStartElement("<a b=\"A\"/>");
+        assertThrows(InvalidLexicalValueException.class, () -> attByName.getAttributeBase64Value("", "b"));
+    }
+
+    @Test
+    void testInvalidQNameThrowsInvalidLexicalValue() throws Exception {
+        // The localname of an xsd:QName must be an NCName, so a value whose
+        // local part still contains a ':' (or any other non-NCName char) is
+        // outside the lexical space. lexQName resolved the prefix but never
+        // checked the parts, so "p:b:c" came back as QName{uri}b:c instead of
+        // being rejected like the holder validate path does.
+        XMLStreamReaderExt colonInLocal = atFirstStartElement("<a xmlns:p='urn:x'>p:b:c</a>");
+        assertThrows(InvalidLexicalValueException.class, colonInLocal::getQNameValue);
+
+        XMLStreamReaderExt spaceInLocal = atFirstStartElement("<a>b c</a>");
+        assertThrows(InvalidLexicalValueException.class, spaceInLocal::getQNameValue);
+
+        XMLStreamReaderExt emptyLocal = atFirstStartElement("<a xmlns:p='urn:x'>p:</a>");
+        assertThrows(InvalidLexicalValueException.class, emptyLocal::getQNameValue);
+
+        XMLStreamReaderExt attColon = atFirstStartElement("<a xmlns:p='urn:x' b='p:b:c'/>");
+        assertThrows(InvalidLexicalValueException.class, () -> attColon.getAttributeQNameValue(0));
+
+        // a well-formed prefixed QName still resolves
+        XMLStreamReaderExt good = atFirstStartElement("<a xmlns:p='urn:x'>p:good</a>");
+        assertEquals(new QName("urn:x", "good"), good.getQNameValue());
+    }
+
+    @Test
+    void testInvalidDateThrowsInvalidLexicalValue() throws Exception {
+        // getDateValue converts the parsed GDate to a java.util.Date via
+        // GDateBuilder.getDate(), which throws IllegalStateException - not
+        // IllegalArgumentException - when the value is not a complete date
+        // (a time/gYear/gYearMonth reaching a dateTime field) or its year is
+        // before the Julian epoch. The getter only caught IllegalArgumentException
+        // so the IllegalStateException escaped instead of the documented
+        // InvalidLexicalValueException the other getters surface.
+        XMLStreamReaderExt timeOnly = atFirstStartElement("<a>12:00:00</a>");
+        assertThrows(InvalidLexicalValueException.class, timeOnly::getDateValue);
+
+        XMLStreamReaderExt yearOnly = atFirstStartElement("<a>2001</a>");
+        assertThrows(InvalidLexicalValueException.class, yearOnly::getDateValue);
+
+        XMLStreamReaderExt ancient = atFirstStartElement("<a>-5000-01-01T00:00:00Z</a>");
+        assertThrows(InvalidLexicalValueException.class, ancient::getDateValue);
+
+        XMLStreamReaderExt attByIndex = atFirstStartElement("<a b='12:00:00'/>");
+        assertThrows(InvalidLexicalValueException.class, () -> attByIndex.getAttributeDateValue(0));
+
+        XMLStreamReaderExt attByName = atFirstStartElement("<a b='12:00:00'/>");
+        assertThrows(InvalidLexicalValueException.class, () -> attByName.getAttributeDateValue("", "b"));
+
+        // a well-formed dateTime still converts
+        XMLStreamReaderExt good = atFirstStartElement("<a>2001-11-26T21:32:52Z</a>");
+        assertEquals(new XmlCalendar("2001-11-26T21:32:52Z").getTime(), good.getDateValue());
+    }
+
+    private static XMLStreamReaderExt atFirstStartElement(String xml) throws Exception {
+        XMLStreamReader xsr = XmlObject.Factory.parse(xml).newXMLStreamReader();
+        XMLStreamReaderExt ext = new XMLStreamReaderExtImpl(xsr);
+        int evt = ext.getEventType();
+        while (evt != XMLEvent.START_ELEMENT && ext.hasNext()) {
+            evt = ext.next();
+        }
+        if (evt != XMLEvent.START_ELEMENT) {
+            throw new IllegalStateException("no start element in: " + xml);
+        }
+        return ext;
     }
 
     private static final String[] strings = {
@@ -200,21 +283,18 @@ public class RichParserTests {
 
     public static String readIS(InputStream is)
         throws IOException {
-        String res = "";
+        StringBuilder res = new StringBuilder();
         byte[] buf = new byte[20];
-        while (true) {
-            int l = is.read(buf);
-            if (l < 0) {
-                break;
-            }
-            res += new String(buf, 0, l);
+        int l;
+        while ((l = is.read(buf)) != -1) {
+            res.append(new String(buf, 0, l));
         }
-        return res;
+        return res.toString();
     }
 
     public static void main(String[] args) throws IOException, XMLStreamException {
         XMLInputFactory factory = XMLInputFactory.newInstance();
-        XMLStreamReader xsr = factory.createXMLStreamReader(new FileInputStream(new File(args[0])));
+        XMLStreamReader xsr = factory.createXMLStreamReader(Files.newInputStream(new File(args[0]).toPath()));
         XMLStreamReaderExt xsrext = new XMLStreamReaderExtImpl(xsr);
 
         while (xsrext.hasNext()) {

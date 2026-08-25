@@ -107,6 +107,7 @@ public class XmlOptions implements java.io.Serializable {
         SAVE_CDATA_LENGTH_THRESHOLD,
         SAVE_CDATA_ENTITY_COUNT_THRESHOLD,
         SAVE_SAX_NO_NSDECLS_IN_ATTRIBUTES,
+        SAVE_NO_ATTRIBUTE_WHITESPACE_ESCAPE,
         LOAD_REPLACE_DOCUMENT_ELEMENT,
         LOAD_STRIP_WHITESPACE,
         LOAD_STRIP_COMMENTS,
@@ -157,11 +158,14 @@ public class XmlOptions implements java.io.Serializable {
         XPATH_USE_SAXON,
         XPATH_USE_XMLBEANS,
         ATTRIBUTE_VALIDATION_COMPAT_MODE,
-
+        LOAD_STRICT_FLOATING_POINT,
+        LOAD_ALLOW_DECIMAL_EXPONENT,
+        MAX_NUMBER_CHARS
     }
 
 
     public static final int DEFAULT_ENTITY_EXPANSION_LIMIT = 2048;
+    public static final int DEFAULT_MAX_NUMBER_CHARS = 1024;
 
     private static final XmlOptions EMPTY_OPTIONS;
 
@@ -212,7 +216,6 @@ public class XmlOptions implements java.io.Serializable {
     public boolean isSaveNamespacesFirst() {
         return hasOption(XmlOptionsKeys.SAVE_NAMESPACES_FIRST);
     }
-
 
     /**
      * This option will cause the saver to reformat white space for easier reading.
@@ -557,6 +560,47 @@ public class XmlOptions implements java.io.Serializable {
 
     public boolean isSaveNoXmlDecl() {
         return hasOption(XmlOptionsKeys.SAVE_NO_XML_DECL);
+    }
+
+    /**
+     * By default the saver now escapes a tab ({@code #x9}), newline ({@code #xA})
+     * and carriage return ({@code #xD}) inside an attribute value as a character
+     * reference ({@code &#9;}, {@code &#10;}, {@code &#13;}). Without that, the
+     * literal characters are normalised to spaces when the document is read back
+     * in, so a save followed by a load silently rewrites the value. Set this
+     * option to restore the long-standing behaviour of writing those characters
+     * literally.
+     *
+     * @return this
+     * @since 5.4.0
+     */
+    public XmlOptions setSaveNoAttributeWhitespaceEscape() {
+        return setSaveNoAttributeWhitespaceEscape(true);
+    }
+
+    /**
+     * Sets whether tab, newline and carriage return are written literally in
+     * attribute values instead of being escaped as character references. See
+     * {@link #setSaveNoAttributeWhitespaceEscape()}.
+     *
+     * @param b {@code true} to write those characters literally (pre-5.4.0 behaviour)
+     * @return this
+     * @since 5.4.0
+     */
+    public XmlOptions setSaveNoAttributeWhitespaceEscape(boolean b) {
+        return set(XmlOptionsKeys.SAVE_NO_ATTRIBUTE_WHITESPACE_ESCAPE, b);
+    }
+
+    /**
+     * Returns whether tab, newline and carriage return are written literally in
+     * attribute values instead of being escaped. See
+     * {@link #setSaveNoAttributeWhitespaceEscape()}.
+     *
+     * @return {@code true} if those characters are written literally
+     * @since 5.4.0
+     */
+    public boolean isSaveNoAttributeWhitespaceEscape() {
+        return hasOption(XmlOptionsKeys.SAVE_NO_ATTRIBUTE_WHITESPACE_ESCAPE);
     }
 
 
@@ -1126,6 +1170,86 @@ public class XmlOptions implements java.io.Serializable {
     }
 
     /**
+     * If this option is set, xsd:float and xsd:double values are held to the XSD
+     * lexical space when parsing. {@link Float#parseFloat}/{@link Double#parseDouble}
+     * also accept lexical forms that XSD does not allow: hexadecimal floats
+     * ({@code 0x1p4}), the Java {@code Infinity} token, and a trailing type suffix
+     * ({@code f}/{@code F}/{@code d}/{@code D}). With this option set those forms are
+     * rejected as invalid; XSD only permits a decimal number with an optional
+     * exponent, or the special values {@code INF}, {@code -INF} and {@code NaN}.
+     * The default value is false, so the long-standing lenient behaviour is
+     * unchanged unless this is set.
+     *
+     * @return this
+     * @since 5.4.0
+     */
+    public XmlOptions setLoadStrictFloatingPoint() {
+        return setLoadStrictFloatingPoint(true);
+    }
+
+    /**
+     * Sets whether xsd:float and xsd:double values are held to the XSD lexical
+     * space when parsing. See {@link #setLoadStrictFloatingPoint()}.
+     *
+     * @param b {@code true} to reject lexical forms outside the XSD float/double space
+     * @return this
+     * @since 5.4.0
+     */
+    public XmlOptions setLoadStrictFloatingPoint(boolean b) {
+        return set(XmlOptionsKeys.LOAD_STRICT_FLOATING_POINT, b);
+    }
+
+    /**
+     * Returns whether xsd:float and xsd:double values are held to the XSD lexical
+     * space when parsing. See {@link #setLoadStrictFloatingPoint()}.
+     *
+     * @return {@code true} if strict XSD float/double parsing is enabled
+     * @since 5.4.0
+     */
+    public boolean isLoadStrictFloatingPoint() {
+        return hasOption(XmlOptionsKeys.LOAD_STRICT_FLOATING_POINT);
+    }
+
+    /**
+     * If this option is set, xsd:decimal values are allowed to use scientific/exponent
+     * notation (e.g. {@code 1E5}) when parsing. That form is outside the xsd:decimal
+     * lexical space - it belongs to xsd:double/xsd:float - and {@link java.math.BigDecimal}
+     * would otherwise parse it to a wrong value ({@code 1E5 -> 100000}). The default is to
+     * disallow it: an exponent in a decimal is reported as invalid. Such values can also be
+     * expensive to parse when the exponent is very large. Set this only to restore the
+     * long-standing lenient behaviour.
+     *
+     * @return this
+     * @since 5.4.0
+     */
+    public XmlOptions setLoadAllowDecimalExponent() {
+        return setLoadAllowDecimalExponent(true);
+    }
+
+    /**
+     * Sets whether xsd:decimal values may use scientific/exponent notation when parsing.
+     * See {@link #setLoadAllowDecimalExponent()}.
+     *
+     * @param b {@code true} to accept an exponent in a decimal lexical value
+     * @return this
+     * @since 5.4.0
+     */
+    public XmlOptions setLoadAllowDecimalExponent(boolean b) {
+        return set(XmlOptionsKeys.LOAD_ALLOW_DECIMAL_EXPONENT, b);
+    }
+
+    /**
+     * Returns whether xsd:decimal values may use scientific/exponent notation when parsing.
+     * See {@link #setLoadAllowDecimalExponent()}.
+     *
+     * @return {@code true} if an exponent is accepted in a decimal lexical value
+     * @since 5.4.0
+     */
+    public boolean isLoadAllowDecimalExponent() {
+        return hasOption(XmlOptionsKeys.LOAD_ALLOW_DECIMAL_EXPONENT);
+    }
+
+    /**
      * Instructs the validator to skip elements matching an {@code <any>}
      * particle with contentModel="lax". This is useful because,
      * in certain situations, XmlBeans will find types on the
@@ -1479,6 +1603,39 @@ public class XmlOptions implements java.io.Serializable {
         }
     }
 
+    /**
+     * @return the maximum number of characters allowed for a number
+     * @since 5.4.0
+     */
+    public int getMaxNumberOfCharsForNumbers() {
+        Object value = get(XmlOptionsKeys.MAX_NUMBER_CHARS);
+        if (value instanceof Number) {
+            return ((Number) value).intValue();
+        }
+        return DEFAULT_MAX_NUMBER_CHARS;
+    }
+
+    /**
+     * Sets the maximum number of characters allowed for a number
+     * @param max the maximum number of characters
+     * @since 5.4.0
+     */
+    public void setMaxNumberOfCharsForNumbers(int max) {
+        set(XmlOptionsKeys.MAX_NUMBER_CHARS, max);
+    }
+
+    /**
+     * Sets the maximum number of characters allowed for a number
+     * @param max the maximum number of characters, null means apply the default of 1024
+     * @since 5.4.0
+     */
+    public void setMaxNumberOfCharsForNumbers(Integer max) {
+        if (max == null) {
+            remove(XmlOptionsKeys.MAX_NUMBER_CHARS);
+        } else {
+            set(XmlOptionsKeys.MAX_NUMBER_CHARS, max);
+        }
+    }
 
     /**
      * If passed null, returns an empty options object.  Otherwise, returns its argument.

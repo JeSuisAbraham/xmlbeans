@@ -168,6 +168,13 @@
                     <description>sourceSchemas is a comma-delimited list of all the schemas you want to compile</description>
                 </parameter>
                 <parameter>
+                    <name>recurseSourceSubdirs</name>
+                    <type>boolean</type>
+                    <required>false</required>
+                    <editable>true</editable>
+                    <description>recurseSourceSubdirs determines if subdirectories of sourceDir are checked for schemas</description>
+                </parameter>
+                <parameter>
                     <name>xmlConfigs</name>
                     <type>java.lang.String</type>
                     <required>false</required>
@@ -363,6 +370,7 @@
                 <buildSchemas implementation="boolean" default-value="true"/>
                 <sourceDir implementation="java.lang.String" default-value="${project.basedir}/src/main/schema"/>
                 <sourceSchemas implementation="java.lang.String" default-value="*.xsd,*.wsdl,*.java"/>
+                <recurseSourceSubdirs implementation="boolean" default-value="false"/>
                 <xmlConfigs implementation="java.lang.String" default-value="${project.basedir}/src/schema/xmlconfig.xml"/>
                 <javaTargetDir implementation="java.lang.String" default-value="${project.basedir}/target/generated-sources"/>
                 <classTargetDir implementation="java.lang.String" default-value="${project.basedir}/target/generated-resources"/>
@@ -389,37 +397,37 @@
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-plugin-api</artifactId>
-            <version>3.6.1</version>
+            <version>3.9.16</version>
         </dependency>
         <dependency>
             <groupId>org.apache.maven</groupId>
             <artifactId>maven-core</artifactId>
-            <version>3.0</version>
+            <version>3.9.16</version>
         </dependency>
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-api</artifactId>
-            <version>2.20.0</version>
+            <version>2.26.1</version>
         </dependency>
         <dependency>
             <groupId>org.apache.logging.log4j</groupId>
             <artifactId>log4j-core</artifactId>
-            <version>2.20.0</version>
+            <version>2.26.1</version>
         </dependency>
         <dependency>
             <groupId>net.sf.saxon</groupId>
             <artifactId>Saxon-HE</artifactId>
-            <version>11.5</version>
+            <version>12.10</version>
         </dependency>
         <dependency>
             <groupId>com.github.javaparser</groupId>
             <artifactId>javaparser-core</artifactId>
-            <version>3.25.0</version>
+            <version>3.28.2</version>
         </dependency>
         <dependency>
             <groupId>com.github.javaparser</groupId>
             <artifactId>javaparser-symbol-solver-core</artifactId>
-            <version>3.25.0</version>
+            <version>3.28.2</version>
         </dependency>
     </dependencies>
 </plugin>

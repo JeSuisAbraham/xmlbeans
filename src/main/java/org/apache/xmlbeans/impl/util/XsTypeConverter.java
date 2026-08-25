@@ -17,6 +17,7 @@ package org.apache.xmlbeans.impl.util;
 
 import org.apache.xmlbeans.*;
 import org.apache.xmlbeans.impl.common.InvalidLexicalValueException;
+import org.apache.xmlbeans.impl.common.XMLChar;
 
 import javax.xml.namespace.NamespaceContext;
 import javax.xml.namespace.QName;
@@ -26,6 +27,7 @@ import java.net.URI;
 import java.util.Calendar;
 import java.util.Collection;
 import java.util.Date;
+import java.util.Locale;
 
 public final class XsTypeConverter {
     private static final String POS_INF_LEX = "INF";
@@ -34,47 +36,94 @@ public final class XsTypeConverter {
 
     private static final char NAMESPACE_SEP = ':';
     private static final String EMPTY_PREFIX = "";
-    private static final BigDecimal DECIMAL__ZERO = new BigDecimal(0.0);
 
     // See Section 2.4.3 of FRC2396  http://www.ietf.org/rfc/rfc2396.txt
     private static final String[] URI_CHARS_TO_BE_REPLACED = {" ", "{", "}", "|", "\\", "^", "[", "]", "`"};
     private static final String[] URI_CHARS_REPLACED_WITH = {"%20", "%7b", "%7d", "%7c", "%5c", "%5e", "%5b", "%5d", "%60"};
 
+    // Float.parseFloat / Double.parseDouble accept lexical forms that are not
+    // in the XSD float/double value space: hexadecimal floats (0x1p4), the Java
+    // "Infinity" token, and a trailing type suffix (f/F/d/D). XSD only allows a
+    // decimal number with an optional exponent, or the special values INF, -INF
+    // and NaN. This is only applied when strict floating point parsing is
+    // requested (XmlOptions.setLoadStrictFloatingPoint); the default stays lenient.
+    private static void checkFloatingPointLexical(CharSequence cs) {
+        final int len = cs.length();
+        for (int i = 0; i < len; i++) {
+            switch (cs.charAt(i)) {
+                case 'x':
+                case 'X':
+                case 'p':
+                case 'P':
+                case 'i':
+                case 't':
+                case 'y':
+                    throw new NumberFormatException("invalid char '" + cs.charAt(i) + "' in floating point value");
+                default:
+                    break;
+            }
+        }
+        if (len > 0) {
+            final char last = cs.charAt(len - 1);
+            // a trailing 'F' is only valid as the last char of "INF"
+            if (last == 'd' || last == 'D' ||
+                ((last == 'f' || last == 'F') && (len < 2 || cs.charAt(len - 2) != 'N'))) {
+                throw new NumberFormatException("invalid trailing char '" + last + "' in floating point value");
+            }
+        }
+    }
+
     // ======================== float ========================
     public static float lexFloat(CharSequence cs)
         throws NumberFormatException {
-        final String v = cs.toString();
-        try {
-            //current jdk impl of parseFloat calls trim() on the string.
-            //Any other space is illegal anyway, whether there are one or more spaces.
-            //so no need to do a collapse pass through the string.
-            if (cs.length() > 0) {
-                char ch = cs.charAt(cs.length() - 1);
-                if (ch == 'f' || ch == 'F') {
-                    if (cs.charAt(cs.length() - 2) != 'N') {
-                        throw new NumberFormatException("Invalid char '" + ch + "' in float.");
-                    }
-                }
-            }
-            return Float.parseFloat(v);
-        } catch (NumberFormatException e) {
-            if (v.equals(POS_INF_LEX)) {
-                return Float.POSITIVE_INFINITY;
-            }
-            if (v.equals(NEG_INF_LEX)) {
-                return Float.NEGATIVE_INFINITY;
-            }
-            if (v.equals(NAN_LEX)) {
-                return Float.NaN;
-            }
+        return lexFloat(cs, false, XmlOptions.DEFAULT_MAX_NUMBER_CHARS);
+    }
 
-            throw e;
+    /**
+     * Parses an xsd:float lexical value.
+     *
+     * @param cs     the lexical value
+     * @param strict when {@code true}, lexical forms that {@link Float#parseFloat} accepts
+     *               but XSD does not are rejected: hexadecimal floats ({@code 0x1p4}), the
+     *               Java {@code Infinity} token, and a trailing type suffix
+     *               ({@code f}/{@code F}/{@code d}/{@code D}). When {@code false} the
+     *               long-standing lenient behaviour applies. Driven by
+     *               {@link org.apache.xmlbeans.XmlOptions#setLoadStrictFloatingPoint()}.
+     * @param maxNumberOfChars the maximum number of characters allowed in the string
+     * @return the parsed float
+     * @throws NumberFormatException if the value is not a valid xsd:float
+     * @since 5.4.0
+     */
+    public static float lexFloat(CharSequence cs, boolean strict,
+                                 int maxNumberOfChars)
+        throws NumberFormatException {
+        rejectInvalidNumber(cs);
+        final String v = cs.toString();
+        switch (v) {
+            case POS_INF_LEX:
+                return Float.POSITIVE_INFINITY;
+            case NEG_INF_LEX:
+                return Float.NEGATIVE_INFINITY;
+            case NAN_LEX:
+                return Float.NaN;
         }
+        //current jdk impl of parseFloat calls trim() on the string.
+        //Any other space is illegal anyway, whether there are one or more spaces.
+        //so no need to do a collapse pass through the string.
+        if (strict) {
+            checkFloatingPointLexical(cs);
+        } else if (cs.length() > 1) {
+            char ch = cs.charAt(cs.length() - 1);
+            if ((ch == 'f' || ch == 'F') && cs.charAt(cs.length() - 2) != 'N') {
+                throw new NumberFormatException("Invalid char '" + ch + "' in float.");
+            }
+        }
+        return MathUtil.parseAsFloat(v, maxNumberOfChars);
     }
 
     public static float lexFloat(CharSequence cs, Collection<XmlError> errors) {
         try {
-            return lexFloat(cs);
+            return lexFloat(cs, false, XmlOptions.DEFAULT_MAX_NUMBER_CHARS);
         } catch (NumberFormatException e) {
             String msg = "invalid float: " + cs;
             errors.add(XmlError.forMessage(msg));
@@ -99,37 +148,54 @@ public final class XsTypeConverter {
     // ======================== double ========================
     public static double lexDouble(CharSequence cs)
         throws NumberFormatException {
+        return lexDouble(cs, false,  XmlOptions.DEFAULT_MAX_NUMBER_CHARS);
+    }
+
+    /**
+     * Parses an xsd:double lexical value.
+     *
+     * @param cs     the lexical value
+     * @param strict when {@code true}, lexical forms that {@link Double#parseDouble} accepts
+     *               but XSD does not are rejected: hexadecimal floats ({@code 0x1p4}), the
+     *               Java {@code Infinity} token, and a trailing type suffix
+     *               ({@code f}/{@code F}/{@code d}/{@code D}). When {@code false} the
+     *               long-standing lenient behaviour applies. Driven by
+     *               {@link org.apache.xmlbeans.XmlOptions#setLoadStrictFloatingPoint()}.
+     * @param maxNumberOfChars the maximum number of characters allowed in the string
+     * @return the parsed double
+     * @throws NumberFormatException if the value is not a valid xsd:double
+     * @since 5.4.0
+     */
+    public static double lexDouble(CharSequence cs, boolean strict,
+                                   int maxNumberOfChars)
+        throws NumberFormatException {
+        rejectInvalidNumber(cs);
         final String v = cs.toString();
-
-        try {
-            //current jdk impl of parseDouble calls trim() on the string.
-            //Any other space is illegal anyway, whether there are one or more spaces.
-            //so no need to do a collapse pass through the string.
-            if (cs.length() > 0) {
-                char ch = cs.charAt(cs.length() - 1);
-                if (ch == 'd' || ch == 'D') {
-                    throw new NumberFormatException("Invalid char '" + ch + "' in double.");
-                }
-            }
-            return Double.parseDouble(v);
-        } catch (NumberFormatException e) {
-            if (v.equals(POS_INF_LEX)) {
+        switch (v) {
+            case POS_INF_LEX:
                 return Double.POSITIVE_INFINITY;
-            }
-            if (v.equals(NEG_INF_LEX)) {
+            case NEG_INF_LEX:
                 return Double.NEGATIVE_INFINITY;
-            }
-            if (v.equals(NAN_LEX)) {
+            case NAN_LEX:
                 return Double.NaN;
-            }
-
-            throw e;
         }
+        //current jdk impl of parseDouble calls trim() on the string.
+        //Any other space is illegal anyway, whether there are one or more spaces.
+        //so no need to do a collapse pass through the string.
+        if (strict) {
+            checkFloatingPointLexical(cs);
+        } else if (cs.length() > 0) {
+            char ch = cs.charAt(cs.length() - 1);
+            if (ch == 'd' || ch == 'D') {
+                throw new NumberFormatException("Invalid char '" + ch + "' in double.");
+            }
+        }
+        return MathUtil.parseAsDouble(v, maxNumberOfChars);
     }
 
     public static double lexDouble(CharSequence cs, Collection<XmlError> errors) {
         try {
-            return lexDouble(cs);
+            return lexDouble(cs, false, XmlOptions.DEFAULT_MAX_NUMBER_CHARS);
         } catch (NumberFormatException e) {
             String msg = "invalid double: " + cs;
             errors.add(XmlError.forMessage(msg));
@@ -154,6 +220,30 @@ public final class XsTypeConverter {
     // ======================== decimal ========================
     public static BigDecimal lexDecimal(CharSequence cs)
         throws NumberFormatException {
+        return lexDecimal(cs, false);
+    }
+
+    /**
+     * Parses an xsd:decimal lexical value.
+     *
+     * @param cs            the lexical value
+     * @param allowExponent when {@code false} (the default) scientific/exponent notation
+     *                      such as {@code 1E5} is rejected: it is outside the xsd:decimal
+     *                      lexical space (that form belongs to xsd:double/xsd:float) and
+     *                      {@link BigDecimal} would otherwise parse it to a wrong value
+     *                      ({@code 1E5 -> 100000}). When {@code true} the long-standing
+     *                      lenient behaviour applies and an exponent is accepted. Driven by
+     *                      {@link org.apache.xmlbeans.XmlOptions#setLoadAllowDecimalExponent()}.
+     * @return the parsed decimal
+     * @throws NumberFormatException if the value is not a valid xsd:decimal
+     * @since 5.4.0
+     */
+    public static BigDecimal lexDecimal(CharSequence cs, boolean allowExponent)
+        throws NumberFormatException {
+        rejectInvalidNumber(cs);
+        if (!allowExponent) {
+            rejectExponent(cs);
+        }
         final String v = cs.toString();
 
         //TODO: review this
@@ -162,7 +252,7 @@ public final class XsTypeConverter {
         //equals() method, but the xml value
         //space does not consider them significant.
         //See http://www.w3.org/2001/05/xmlschema-errata#e2-44
-        return new BigDecimal(trimTrailingZeros(v));
+        return MathUtil.parseAsBigDecimal(trimTrailingZeros(v));
     }
 
     private static final char[] CH_ZEROS = new char[]{'0', '0', '0', '0', '0', '0', '0', '0',
@@ -174,7 +264,7 @@ public final class XsTypeConverter {
         // The following code comes from Apache Harmony
         String intStr = value.unscaledValue().toString();
         int scale = value.scale();
-        if ((scale == 0) || ((value.longValue() == 0) && (scale < 0))) {
+        if (scale == 0 || (MathUtil.toLong(value) == 0 && scale < 0)) {
             return intStr;
         }
 
@@ -217,16 +307,12 @@ public final class XsTypeConverter {
     // ======================== integer ========================
     public static BigInteger lexInteger(CharSequence cs)
         throws NumberFormatException {
-        if (cs.length() > 1) {
-            if (cs.charAt(0) == '+' && cs.charAt(1) == '-') {
-                throw new NumberFormatException("Illegal char sequence '+-'");
-            }
-        }
+        rejectSignAfterPlus(cs);
         final String v = cs.toString();
 
         //TODO: consider special casing zero and one to return static values
         //from BigInteger to avoid object creation.
-        return new BigInteger(trimInitialPlus(v));
+        return MathUtil.parseAsBigInteger(trimInitialPlus(v));
     }
 
     public static BigInteger lexInteger(CharSequence cs, Collection<XmlError> errors) {
@@ -246,8 +332,24 @@ public final class XsTypeConverter {
     // ======================== long ========================
     public static long lexLong(CharSequence cs)
         throws NumberFormatException {
+        rejectInvalidNumber(cs);
+        rejectSignAfterPlus(cs);
         final String v = cs.toString();
-        return Long.parseLong(trimInitialPlus(v));
+        return MathUtil.parseAsLong(trimInitialPlus(v));
+    }
+
+    // trimInitialPlus drops a single leading '+', then Long.parseLong /
+    // new BigInteger accept their own leading sign, so "++5" and "+-5" slip
+    // through as 5 and -5. Neither is in the xsd integer lexical space
+    // ([\-+]?[0-9]+ allows one sign). lexInt/lexShort/lexByte already reject
+    // the second sign in parseIntXsdNumber.
+    private static void rejectSignAfterPlus(CharSequence cs) {
+        if (cs.length() > 1 && cs.charAt(0) == '+') {
+            final char c = cs.charAt(1);
+            if (c == '+' || c == '-') {
+                throw new NumberFormatException("Illegal char sequence '+" + c + "'");
+            }
+        }
     }
 
     public static long lexLong(CharSequence cs, Collection<XmlError> errors) {
@@ -289,7 +391,7 @@ public final class XsTypeConverter {
     // ======================== int ========================
     public static int lexInt(CharSequence cs)
         throws NumberFormatException {
-        return parseInt(cs);
+        return parseIntXsdNumber(cs, Integer.MIN_VALUE, Integer.MAX_VALUE);
     }
 
     public static int lexInt(CharSequence cs, Collection<XmlError> errors) {
@@ -374,7 +476,7 @@ public final class XsTypeConverter {
     }
 
     public static String printBoolean(boolean value) {
-        return (value ? "true" : "false");
+        return Boolean.toString(value);
     }
 
 
@@ -401,17 +503,24 @@ public final class XsTypeConverter {
             prefix = charSeq.subSequence(0, firstcolon).toString();
             localname = charSeq.subSequence(firstcolon + 1, charSeq.length()).toString();
             if (firstcolon == 0) {
-                throw new InvalidLexicalValueException("invalid xsd:QName '" + charSeq.toString() + "'");
+                throw new InvalidLexicalValueException("invalid xsd:QName '" + charSeq + "'");
             }
         } else {
             prefix = EMPTY_PREFIX;
             localname = charSeq.toString();
         }
 
+        if (!prefix.isEmpty() && !XMLChar.isValidNCName(prefix)) {
+            throw new InvalidLexicalValueException("invalid xsd:QName '" + charSeq + "'");
+        }
+        if (!XMLChar.isValidNCName(localname)) {
+            throw new InvalidLexicalValueException("invalid xsd:QName '" + charSeq + "'");
+        }
+
         String uri = nscontext.getNamespaceURI(prefix);
 
         if (uri == null) {
-            if (prefix != null && prefix.length() > 0) {
+            if (prefix != null && !prefix.isEmpty()) {
                 throw new InvalidLexicalValueException("Can't resolve prefix: " + prefix);
             }
 
@@ -428,7 +537,7 @@ public final class XsTypeConverter {
         } catch (InvalidLexicalValueException e) {
             errors.add(XmlError.forMessage(e.getMessage()));
             final int idx = xsd_qname.indexOf(NAMESPACE_SEP);
-            return new QName(null, xsd_qname.substring(idx));
+            return idx < 0 ? new QName(xsd_qname) : new QName(null, xsd_qname.substring(idx));
         }
     }
 
@@ -437,7 +546,7 @@ public final class XsTypeConverter {
         final String uri = qname.getNamespaceURI();
         assert uri != null; //qname is not allowed to have null uri values
         final String prefix;
-        if (uri.length() > 0) {
+        if (!uri.isEmpty()) {
             prefix = nsContext.getPrefix(uri);
             if (prefix == null) {
                 String msg = "NamespaceContext does not provide" +
@@ -455,9 +564,9 @@ public final class XsTypeConverter {
                                         String localpart,
                                         String prefix) {
         if (prefix != null &&
-            uri != null &&
-            uri.length() > 0 &&
-            prefix.length() > 0) {
+                uri != null &&
+                !uri.isEmpty() &&
+                !prefix.isEmpty()) {
             return (prefix + NAMESPACE_SEP + localpart);
         } else {
             return localpart;
@@ -529,8 +638,7 @@ public final class XsTypeConverter {
                                                    int builtin_type_code) {
         GDateBuilder gDateBuilder = new GDateBuilder(d);
         gDateBuilder.setBuiltinTypeCode(builtin_type_code);
-        GDate value = gDateBuilder.toGDate();
-        return value;
+        return gDateBuilder.toGDate();
     }
 
 
@@ -538,20 +646,18 @@ public final class XsTypeConverter {
                                                    int builtin_type_code) {
         GDateBuilder gDateBuilder = new GDateBuilder(c);
         gDateBuilder.setBuiltinTypeCode(builtin_type_code);
-        GDate value = gDateBuilder.toGDate();
-        return value;
+        return gDateBuilder.toGDate();
     }
 
     public static GDateSpecification getGDateValue(CharSequence v,
                                                    int builtin_type_code) {
         GDateBuilder gDateBuilder = new GDateBuilder(v);
         gDateBuilder.setBuiltinTypeCode(builtin_type_code);
-        GDate value = gDateBuilder.toGDate();
-        return value;
+        return gDateBuilder.toGDate();
     }
 
     private static String trimInitialPlus(String xml) {
-        if (xml.length() > 0 && xml.charAt(0) == '+') {
+        if (!xml.isEmpty() && xml.charAt(0) == '+') {
             return xml.substring(1);
         } else {
             return xml;
@@ -560,7 +666,7 @@ public final class XsTypeConverter {
 
     private static String trimTrailingZeros(String xsd_decimal) {
         final int last_char_idx = xsd_decimal.length() - 1;
-        if (xsd_decimal.charAt(last_char_idx) == '0') {
+        if (last_char_idx >= 0 && xsd_decimal.charAt(last_char_idx) == '0') {
             final int last_point = xsd_decimal.lastIndexOf('.');
             if (last_point >= 0) {
                 //find last trailing zero
@@ -576,10 +682,6 @@ public final class XsTypeConverter {
         return xsd_decimal;
     }
 
-    private static int parseInt(CharSequence cs) {
-        return parseIntXsdNumber(cs, Integer.MIN_VALUE, Integer.MAX_VALUE);
-    }
-
     private static short parseShort(CharSequence cs) {
         return (short) parseIntXsdNumber(cs, Short.MIN_VALUE, Short.MAX_VALUE);
     }
@@ -589,57 +691,60 @@ public final class XsTypeConverter {
     }
 
     private static int parseIntXsdNumber(CharSequence ch, int min_value, int max_value) {
-        // int parser on a CharSequence
-        int length = ch.length();
-        if (length < 1) {
-            throw new NumberFormatException("For input string: \"" + ch.toString() + "\"");
+        rejectInvalidNumber(ch);
+
+        final int len = ch.length();
+        int i = 0;
+        boolean negative = false;
+
+        // Sign
+        char first = ch.charAt(0);
+        if (first == '-') {
+            negative = true;
+            i = 1;
+        } else if (first == '+') {
+            i = 1;
         }
 
-        int sign = 1;
-        int result = 0;
-        int start = 0;
-        int limit;
-        int limit2;
-
-        char c = ch.charAt(0);
-        if (c == '-') {
-            start++;
-            limit = (min_value / 10);
-            limit2 = -(min_value % 10);
-        } else if (c == '+') {
-            start++;
-            sign = -1;
-            limit = -(max_value / 10);
-            limit2 = (max_value % 10);
-        } else {
-            sign = -1;
-            limit = -(max_value / 10);
-            limit2 = (max_value % 10);
+        if (i == len) {
+            throw new NumberFormatException("For input string: \"" + ch + "\""); // just "+" or "-"
         }
 
-        for (int i = 0; i < length - start; i++) {
-            c = ch.charAt(i + start);
-            int v = Character.digit(c, 10);
+        long result = 0;           // Use long to avoid intermediate overflow
 
-            if (v < 0) {
-                throw new NumberFormatException("For input string: \"" + ch.toString() + "\"");
+        while (i < len) {
+            char c = ch.charAt(i++);
+            int digit = c - '0';
+            if (digit < 0 || digit > 9) {
+                throw new NumberFormatException("For input string: \"" + ch + "\"");
             }
 
-            if (result < limit || (result == limit && v > limit2)) {
-                throw new NumberFormatException("For input string: \"" + ch.toString() + "\"");
+            // Early overflow detection
+            if (result > (Long.MAX_VALUE / 10)) {
+                throw new NumberFormatException("For input string: \"" + ch + "\"");
             }
-
-            result = result * 10 - v;
+            result = result * 10 + digit;
         }
 
-        return sign * result;
+        if (negative) {
+            result = -result;
+        }
+
+        if (result < min_value || result > max_value) {
+            throw new NumberFormatException(String.format(
+                    Locale.ROOT,
+                    "For input string: \"%s\"; min-allowed=%d, max-allowed=%d",
+                    ch, min_value, max_value));
+        }
+
+        return Math.toIntExact(result);
     }
 
     // ======================== anyURI ========================
 
     /**
-     * Checkes the regular expression of URI, defined by RFC2369 http://www.ietf.org/rfc/rfc2396.txt Appendix B.
-     * Note: The whitespace normalization rule collapse must be applied priot to calling this method.
+     * Checks the regular expression of URI, defined by RFC2369 http://www.ietf.org/rfc/rfc2396.txt Appendix B.
+     * Note: The whitespace normalization rule collapse must be applied prior to calling this method.
      *
      * @param lexical_value the lexical value
      * @return same input value if input value is in the lexical space
@@ -677,5 +782,25 @@ public final class XsTypeConverter {
         }
 
         return lexical_value;
+    }
+
+    private static void rejectInvalidNumber(CharSequence cs) {
+        if (cs == null || cs.length() == 0) {
+            throw new NumberFormatException("For input string: \"" + cs + "\"");
+        }
+    }
+
+    // BigDecimal accepts scientific notation such as "1E5", but the xsd:decimal
+    // lexical space does not allow an exponent - that form belongs to xsd:double
+    // and xsd:float. Without this check an exponent value reaching lexDecimal via
+    // the rich parser parses to a wrong value (e.g. "1E5" -> 100000) instead of
+    // being reported as invalid.
+    private static void rejectExponent(CharSequence cs) {
+        for (int i = 0, len = cs.length(); i < len; i++) {
+            final char c = cs.charAt(i);
+            if (c == 'e' || c == 'E') {
+                throw new NumberFormatException("invalid char '" + c + "' in decimal value");
+            }
+        }
     }
 }

@@ -1002,7 +1002,7 @@ public class StscComplexTypeResolver {
     static SchemaParticle extendContentModel(SchemaParticle baseContentModel, SchemaParticle extendedContentModel, XmlObject parseTree) {
         // http://www.w3.org/TR/xmlschema-1/#element-complexContent::extension
 
-        // 2.1 If the explicit content is empty, then the {content type} of the type definition resolved to by the �actual value� of the base [attribute]
+        // 2.1 If the explicit content is empty, then the {content type} of the type definition resolved to by the actual value of the base [attribute]
         if (extendedContentModel == null) {
             return baseContentModel;
         }
@@ -1870,8 +1870,8 @@ public class StscComplexTypeResolver {
         new CodeForNameEntry(QNameHelper.forLNS("group", "http://www.w3.org/2001/XMLSchema"), MODEL_GROUP_CODE),
     };
 
-    private static final Map<QName, Integer> particleCodeMap =
-        Stream.of(particleCodes).collect(Collectors.toMap(pc -> pc.name, pc -> pc.code));
+    private static final Map<QName, Integer> particleCodeMap = Collections.unmodifiableMap(
+        Stream.of(particleCodes).collect(Collectors.toMap(pc -> pc.name, pc -> pc.code)));
 
     private static int translateParticleCode(Group parseEg) {
         if (parseEg == null) {
@@ -1896,8 +1896,8 @@ public class StscComplexTypeResolver {
         new CodeForNameEntry(QNameHelper.forLNS("anyAttribute", "http://www.w3.org/2001/XMLSchema"), ANY_ATTRIBUTE_CODE),
     };
 
-    private static final Map<QName,Integer> attributeCodeMap =
-        Stream.of(attributeCodes).collect(Collectors.toMap(ac -> ac.name, ac -> ac.code));
+    private static final Map<QName,Integer> attributeCodeMap = Collections.unmodifiableMap(
+        Stream.of(attributeCodes).collect(Collectors.toMap(ac -> ac.name, ac -> ac.code)));
 
     static int translateAttributeCode(QName currentName) {
         return attributeCodeMap.getOrDefault(currentName, 0);

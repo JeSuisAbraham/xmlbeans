@@ -1382,7 +1382,7 @@ abstract class Xobj implements TypeStore {
      * with a return value of null, which indicates an illegal
      * state, where there is no mapping for the given prefix.
      * <p>
-     * If the the default namespace is not explicitly mapped in the xml,
+     * If the default namespace is not explicitly mapped in the xml,
      * the xml spec says that it should be mapped to the no-namespace.
      * When the 'defaultAlwaysMapped' parameter is true, the default namepsace
      * will return the no-namespace even if it is not explicity
@@ -1419,7 +1419,7 @@ abstract class Xobj implements TypeStore {
             }
         }
 
-        return defaultAlwaysMapped && prefix.length() == 0 ? "" : null;
+        return defaultAlwaysMapped && prefix.isEmpty() ? "" : null;
     }
 
     final String prefixForNamespace(String ns, String suggestion, boolean createIfMissing) {
@@ -1447,7 +1447,7 @@ abstract class Xobj implements TypeStore {
 
         // Special handling for the no-namespace case
 
-        if (ns.length() == 0) {
+        if (ns.isEmpty()) {
             // Search for a namespace decl which defines the default namespace
 
             Xobj a = base.findXmlnsForPrefix("");
@@ -1455,7 +1455,7 @@ abstract class Xobj implements TypeStore {
             // If I did not find a default decl or the decl maps to the no namespace, then
             // the default namespace is mapped to ""
 
-            if (a == null || a.getXmlnsUri().length() == 0) {
+            if (a == null || a.getXmlnsUri().isEmpty()) {
                 return "";
             }
 
@@ -1494,7 +1494,7 @@ abstract class Xobj implements TypeStore {
         // Sanitize the suggestion.
 
         if (suggestion != null &&
-            (suggestion.length() == 0 || suggestion.toLowerCase(java.util.Locale.ROOT).startsWith("xml") ||
+            (suggestion.isEmpty() || suggestion.toLowerCase(java.util.Locale.ROOT).startsWith("xml") ||
              base.findXmlnsForPrefix(suggestion) != null)) {
             suggestion = null;
         }
@@ -1832,7 +1832,7 @@ abstract class Xobj implements TypeStore {
 
             c.moveNodeContents(null, false);
 
-            if (text != null && text.length() > 0) {
+            if (text != null && !text.isEmpty()) {
                 c.next();
                 c.insertString(text);
             }

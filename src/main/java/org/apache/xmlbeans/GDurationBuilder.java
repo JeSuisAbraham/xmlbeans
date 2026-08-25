@@ -19,6 +19,8 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 
+import org.apache.xmlbeans.impl.util.MathUtil;
+
 /**
  * Used to build {@link GDuration GDurations}.
  */
@@ -322,7 +324,7 @@ public class GDurationBuilder implements GDurationSpecification, java.io.Seriali
      * modulo(a, b) = a - fQuotient(a,b)*b
      */
     private static int _mod(long a, int b, long quotient) {
-        return (int) (a - quotient * b);
+        return Math.toIntExact(a - quotient * b);
     }
 
 
@@ -348,7 +350,7 @@ public class GDurationBuilder implements GDurationSpecification, java.io.Seriali
         if (_fs != null && (_fs.signum() < 0 || _fs.compareTo(GDate._one) >= 0)) {
             BigDecimal bdcarry = _fs.setScale(0, RoundingMode.FLOOR);
             _fs = _fs.subtract(bdcarry);
-            carry = bdcarry.intValue();
+            carry = MathUtil.toInt(bdcarry);
         }
 
         if (carry != 0 || _s < 0 || _s > 59 || _m < 0 || _m > 50 || _h < 0 || _h > 23) {

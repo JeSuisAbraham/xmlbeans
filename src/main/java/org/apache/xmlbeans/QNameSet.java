@@ -29,7 +29,7 @@ import java.util.Set;
  * <ul>
  * <li>A QNameSet can cover a finite set of namespaces, additionally including a finite
  *     set of QNames outside those namespaces, and with the exception of
- *     a finite set of QNames excluded from those namespaes:
+ *     a finite set of QNames excluded from those namespaces:
  *   <ul>
  *   <li>excludedQNamesInIncludedURIs == the set of excluded QNames from coveredURIs namespaces
  *   <li>excludedURIs == null
@@ -196,9 +196,9 @@ public final class QNameSet implements QNameSetSpecification, java.io.Serializab
      * Constructs a QNameSetBuilder whose contents are given by
      * the four sets.
      * <p>
-     * This constuctor is PRIVATE because it uses the given
+     * This constructor is PRIVATE because it uses the given
      * sets directly, and it trusts its callers to set only immutable values.
-     * This constructor is is only called by the static builder methods on
+     * This constructor is only called by the static builder methods on
      * QNameSet: those methods are all careful assign only unchanging sets.
      */
     private QNameSet(Set<String> excludedURIs, Set<String> includedURIs, Set<QName> excludedQNamesInIncludedURIs, Set<QName> includedQNamesInExcludedURIs) {
@@ -218,7 +218,7 @@ public final class QNameSet implements QNameSetSpecification, java.io.Serializab
     }
 
     /**
-     * Local xml names are hased using "" as the namespace.
+     * Local xml names are hashed using "" as the namespace.
      */
     private static String nsFromName(QName xmlName) {
         String ns = xmlName.getNamespaceURI();
@@ -252,7 +252,7 @@ public final class QNameSet implements QNameSetSpecification, java.io.Serializab
     /**
      * Returns a new QNameSet that is the intersection of this one and another.
      *
-     * @param set the set to insersect with
+     * @param set the set to intersect with
      * @return the intersection
      */
     public QNameSet intersect(QNameSetSpecification set) {
@@ -343,11 +343,7 @@ public final class QNameSet implements QNameSetSpecification, java.io.Serializab
             return false;
         }
 
-        if (set2.includedQNamesInExcludedURIs().stream().anyMatch(set1::contains)) {
-            return false;
-        }
-
-        return true;
+        return set2.includedQNamesInExcludedURIs().stream().noneMatch(set1::contains);
     }
 
 

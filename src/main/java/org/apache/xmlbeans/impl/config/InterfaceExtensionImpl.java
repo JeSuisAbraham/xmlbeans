@@ -19,7 +19,6 @@ import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
-import com.github.javaparser.ast.type.ReferenceType;
 import com.github.javaparser.ast.type.Type;
 import com.github.javaparser.ast.type.TypeParameter;
 import com.github.javaparser.resolution.MethodUsage;
@@ -283,12 +282,12 @@ public class InterfaceExtensionImpl implements InterfaceExtension {
 
     public String toString() {
         StringBuilder buf = new StringBuilder();
-        buf.append("  static handler: ").append(_delegateToClassName).append("\n");
-        buf.append("  interface: ").append(_interfaceClassName).append("\n");
-        buf.append("  name set: ").append(_xbeanSet).append("\n");
+        buf.append("  static handler: ").append(_delegateToClassName).append('\n');
+        buf.append("  interface: ").append(_interfaceClassName).append('\n');
+        buf.append("  name set: ").append(_xbeanSet).append('\n');
 
         for (int i = 0; i < _methods.length; i++)
-            buf.append("  method[").append(i).append("]=").append(_methods[i]).append("\n");
+            buf.append("  method[").append(i).append("]=").append(_methods[i]).append('\n');
 
         return buf.toString();
     }
@@ -316,7 +315,7 @@ public class InterfaceExtensionImpl implements InterfaceExtension {
 
             _name = method.getName().asString();
             String typeParams = method.getTypeParameters().stream().map(TypeParameter::toString).collect(Collectors.joining(", "));
-            _return = ( typeParams.length() == 0 ? "" : ( " <" + typeParams + "> ") ) +
+            _return = (typeParams.isEmpty() ? "" : ( " <" + typeParams + "> ") ) +
                     replaceInner(method.getType().resolve().describe());
 
             _params = method.getParameters().stream().map(p -> p.getType().resolve().describe())

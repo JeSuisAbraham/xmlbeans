@@ -18,6 +18,7 @@ package org.apache.xmlbeans.impl.schema;
 import org.apache.xmlbeans.*;
 import org.apache.xmlbeans.impl.common.QNameHelper;
 import org.apache.xmlbeans.impl.store.Locale;
+import org.apache.xmlbeans.impl.util.MathUtil;
 import org.apache.xmlbeans.impl.xpath.XPathFactory;
 import org.w3c.dom.DOMImplementation;
 import org.w3c.dom.Node;
@@ -28,6 +29,7 @@ import java.io.*;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
+import java.nio.file.Files;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -159,7 +161,7 @@ public abstract class SchemaTypeLoaderBase implements SchemaTypeLoader {
             options.setDocumentSourceName(fileName);
         }
 
-        try (InputStream fis = new FileInputStream(file)) {
+        try (InputStream fis = Files.newInputStream(file.toPath())) {
             return parse(fis, type, options);
         }
     }
@@ -327,7 +329,7 @@ public abstract class SchemaTypeLoaderBase implements SchemaTypeLoader {
 
         for (int i = parts.size() - 1; i >= 0; i -= 1) {
             String part = parts.get(i);
-            if (part.length() < 1) {
+            if (part.isEmpty()) {
                 throw new IllegalArgumentException();
             }
             int offset = (part.length() >= 2 && part.charAt(1) == '=') ? 2 : 1;
@@ -448,12 +450,7 @@ public abstract class SchemaTypeLoaderBase implements SchemaTypeLoader {
                     if (curType == null) {
                         throw new IllegalArgumentException();
                     } else {
-                        int index;
-                        try {
-                            index = Integer.parseInt(part.substring(offset));
-                        } catch (Exception e) {
-                            throw new IllegalArgumentException();
-                        }
+                        int index = MathUtil.parseAsInt(part.substring(offset));
 
                         if (curType.getSimpleVariety() != SchemaType.UNION) {
                             return null;

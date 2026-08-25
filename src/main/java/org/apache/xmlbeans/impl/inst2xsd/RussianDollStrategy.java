@@ -154,9 +154,9 @@ public class RussianDollStrategy
             (commentBuff.length() == 0 ? comment : commentBuff.insert(0, comment).toString()));
         element.setComment(commnetStr);
 
-        if (children.size() > 0) {
+        if (!children.isEmpty()) {
             // complex content
-            if (collapsedText.length() > 0) {
+            if (!collapsedText.isEmpty()) {
                 elemType.setContentType(Type.COMPLEX_TYPE_MIXED_CONTENT);
             } else {
                 elemType.setContentType(Type.COMPLEX_TYPE_COMPLEX_CONTENT);
@@ -169,7 +169,7 @@ public class RussianDollStrategy
             try (XmlCursor xcForNamespaces = xc.newCursor()) {
                 xcForNamespaces.toParent();
 
-                if (attributes.size() > 0) {
+                if (!attributes.isEmpty()) {
                     elemType.setContentType(Type.COMPLEX_TYPE_SIMPLE_CONTENT);
 
                     Type extendedType = Type.createNamedType(
@@ -208,7 +208,7 @@ public class RussianDollStrategy
                 continue;
             }
 
-            if (currentElem.getName() == child.getName()) {   // same contiguos element
+            if (currentElem.getName() != null && currentElem.getName().equals(child.getName())) {   // same contiguous element
                 combineTypes(currentElem.getType(), child.getType(), options); // unify types
                 combineElementComments(currentElem, child);
                 // minOcc=0 maxOcc=unbounded
@@ -220,7 +220,7 @@ public class RussianDollStrategy
                     checkIfElementReferenceIsNeeded(child, parentNamespace, typeSystemHolder, options);
                     elemType.addElement(child);
                     elemNamesToElements.put(child.getName(), child);
-                } else {   //same non contiguos
+                } else {   //same non contiguous
                     combineTypes(currentElem.getType(), child.getType(), options);
                     combineElementComments(currentElem, child);
                     elemType.setTopParticleForComplexOrMixedContent(Type.PARTICLE_CHOICE_UNBOUNDED);
@@ -743,7 +743,7 @@ public class RussianDollStrategy
     }
 
     protected void combineElementComments(Element into, Element with) {
-        if (with.getComment() != null && with.getComment().length() > 0) {
+        if (with.getComment() != null && !with.getComment().isEmpty()) {
             if (into.getComment() == null) {
                 into.setComment(with.getComment());
             } else {

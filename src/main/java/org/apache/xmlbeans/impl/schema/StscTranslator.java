@@ -19,6 +19,7 @@ import org.apache.xmlbeans.*;
 import org.apache.xmlbeans.impl.common.QNameHelper;
 import org.apache.xmlbeans.impl.common.XMLChar;
 import org.apache.xmlbeans.impl.schema.StscImporter.SchemaToProcess;
+import org.apache.xmlbeans.impl.util.MathUtil;
 import org.apache.xmlbeans.impl.values.NamespaceContext;
 import org.apache.xmlbeans.impl.values.XmlNonNegativeIntegerImpl;
 import org.apache.xmlbeans.impl.values.XmlPositiveIntegerImpl;
@@ -105,7 +106,7 @@ public class StscTranslator {
                     }
                 }
 
-                SchemaTypeImpl t = translateGlobalComplexType(type, targetNamespace, chameleon, redefChain.size() > 0);
+                SchemaTypeImpl t = translateGlobalComplexType(type, targetNamespace, chameleon, !redefChain.isEmpty());
                 state.addGlobalType(t, null);
                 SchemaTypeImpl r;
                 // 2. Traverse the List built in step 1 in reverse and add all the
@@ -135,7 +136,7 @@ public class StscTranslator {
                     }
                 }
 
-                SchemaTypeImpl t = translateGlobalSimpleType(type, targetNamespace, chameleon, redefChain.size() > 0);
+                SchemaTypeImpl t = translateGlobalSimpleType(type, targetNamespace, chameleon, !redefChain.isEmpty());
                 state.addGlobalType(t, null);
                 SchemaTypeImpl r;
                 for (int k = redefChain.size() - 1; k >= 0; k--) {
@@ -172,7 +173,7 @@ public class StscTranslator {
                     }
                 }
 
-                SchemaModelGroupImpl g = translateModelGroup(group, targetNamespace, chameleon, redefChain.size() > 0);
+                SchemaModelGroupImpl g = translateModelGroup(group, targetNamespace, chameleon, !redefChain.isEmpty());
                 state.addModelGroup(g, null);
                 SchemaModelGroupImpl r;
                 for (int k = redefChain.size() - 1; k >= 0; k--) {
@@ -199,7 +200,7 @@ public class StscTranslator {
                     }
                 }
 
-                SchemaAttributeGroupImpl g = translateAttributeGroup(group, targetNamespace, chameleon, redefChain.size() > 0);
+                SchemaAttributeGroupImpl g = translateAttributeGroup(group, targetNamespace, chameleon, !redefChain.isEmpty());
                 state.addAttributeGroup(g, null);
                 SchemaAttributeGroupImpl r;
                 for (int k = redefChain.size() - 1; k >= 0; k--) {
@@ -1387,7 +1388,7 @@ public class StscTranslator {
                 state.error(XmlErrorCodes.NO_XSI, new Object[]{"http://www.w3.org/2001/XMLSchema-instance"}, xsdAttr.xgetName());
             }
 
-            if (qname.getNamespaceURI().length() == 0 && qname.getLocalPart().equals("xmlns")) {
+            if (qname.getNamespaceURI().isEmpty() && qname.getLocalPart().equals("xmlns")) {
                 state.error(XmlErrorCodes.NO_XMLNS, null, xsdAttr.xgetName());
             }
 
@@ -1511,8 +1512,8 @@ public class StscTranslator {
         String text = value.getStringValue();
         BigInteger bigInt;
         try {
-            bigInt = new BigInteger(text);
-        } catch (NumberFormatException e) {
+            bigInt = MathUtil.parseAsBigInteger(text);
+        } catch (Exception e) {
             StscState.get().error(XmlErrorCodes.INVALID_VALUE_DETAIL, new Object[]{text, "nonNegativeInteger", e.getMessage()}, value);
             return null;
         }

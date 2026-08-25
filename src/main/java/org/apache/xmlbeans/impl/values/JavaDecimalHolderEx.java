@@ -18,8 +18,10 @@ package org.apache.xmlbeans.impl.values;
 import org.apache.xmlbeans.SchemaType;
 import org.apache.xmlbeans.XmlErrorCodes;
 import org.apache.xmlbeans.XmlObject;
+import org.apache.xmlbeans.XmlOptions;
 import org.apache.xmlbeans.impl.common.QNameHelper;
 import org.apache.xmlbeans.impl.common.ValidationContext;
+import org.apache.xmlbeans.impl.util.MathUtil;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -38,13 +40,14 @@ public abstract class JavaDecimalHolderEx extends JavaDecimalHolder {
 
     protected void set_text(String s) {
         if (_validateOnSet()) {
-            validateLexical(s, _schemaType, _voorVc);
+            boolean allowExponent = has_store() && get_store().get_locale().isLoadAllowDecimalExponent();
+            validateLexical(s, _schemaType, _voorVc, allowExponent);
         }
 
         BigDecimal v = null;
         try {
-            v = new BigDecimal(s);
-        } catch (NumberFormatException e) {
+            v = MathUtil.parseAsBigDecimal(s);
+        } catch (Exception e) {
             _voorVc.invalid(XmlErrorCodes.DECIMAL, new Object[]{s});
         }
 
@@ -63,7 +66,16 @@ public abstract class JavaDecimalHolderEx extends JavaDecimalHolder {
     }
 
     public static void validateLexical(String v, SchemaType sType, ValidationContext context) {
-        JavaDecimalHolder.validateLexical(v, context);
+        validateLexical(v, sType, context, false);
+    }
+
+    public static void validateLexical(String v, SchemaType sType, ValidationContext context, boolean allowExponent) {
+        validateLexical(v, sType, context, allowExponent, XmlOptions.DEFAULT_MAX_NUMBER_CHARS);
+    }
+
+    public static void validateLexical(String v, SchemaType sType, ValidationContext context,
+                                       boolean allowExponent, int maxNumberOfChars) {
+        JavaDecimalHolder.validateLexical(v, context, allowExponent, maxNumberOfChars);
 
         // check pattern
         if (sType.hasPatternFacet()) {
@@ -78,7 +90,6 @@ public abstract class JavaDecimalHolderEx extends JavaDecimalHolder {
     /**
      * Performs facet validation only.
      */
-
     public static void validateValue(BigDecimal v, SchemaType sType, ValidationContext context) {
         // fractional digits
         XmlObject fd = sType.getFacet(SchemaType.FACET_FRACTION_DIGITS);
@@ -189,7 +200,8 @@ public abstract class JavaDecimalHolderEx extends JavaDecimalHolder {
     }
 
     protected void validate_simpleval(String lexical, ValidationContext ctx) {
-        validateLexical(lexical, schemaType(), ctx);
+        boolean allowExponent = has_store() && get_store().get_locale().isLoadAllowDecimalExponent();
+        validateLexical(lexical, schemaType(), ctx, allowExponent);
         validateValue(getBigDecimalValue(), schemaType(), ctx);
     }
 

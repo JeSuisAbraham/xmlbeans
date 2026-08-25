@@ -15,7 +15,6 @@
 
 package org.apache.xmlbeans.impl.store;
 
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.xmlbeans.*;
 import org.apache.xmlbeans.XmlCursor.XmlBookmark;
@@ -23,6 +22,7 @@ import org.apache.xmlbeans.impl.common.QNameHelper;
 import org.apache.xmlbeans.impl.common.ResolverUtil;
 import org.apache.xmlbeans.impl.common.SAXHelper;
 import org.apache.xmlbeans.impl.common.XmlLocale;
+import org.apache.xmlbeans.impl.logging.XmlBeansLogManager;
 import org.apache.xmlbeans.impl.store.Cur.Locations;
 import org.apache.xmlbeans.impl.store.DomImpl.Dom;
 import org.apache.xmlbeans.impl.store.Saaj.SaajCallback;
@@ -48,12 +48,13 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 
+import static org.apache.xmlbeans.impl.util.StringUtil.equalsIgnoreCase;
 import static org.apache.xmlbeans.impl.values.TypeStore.*;
 
 @SuppressWarnings("SynchronizationOnLocalVariableOrMethodParameter")
 public final class Locale
     implements DOMImplementation, SaajCallback, XmlLocale {
-    private static final Logger LOG = LogManager.getLogger(Locale.class);
+    private static final Logger LOG = XmlBeansLogManager.getLogger(Locale.class);
 
     static final int ROOT = Cur.ROOT;
     static final int ELEM = Cur.ELEM;
@@ -101,6 +102,10 @@ public final class Locale
         _schemaTypeLoader = stl;
 
         _validateOnSet = options.isValidateOnSet();
+
+        _loadStrictFloatingPoint = options.isLoadStrictFloatingPoint();
+
+        _loadAllowDecimalExponent = options.isLoadAllowDecimalExponent();
 
         //
         // Check for Saaj implementation request
@@ -280,9 +285,9 @@ public final class Locale
         if (name.getNamespaceURI() == null) {
             sb.append("<no namespace>");
         } else {
-            sb.append("\"");
+            sb.append('\"');
             sb.append(name.getNamespaceURI());
-            sb.append("\"");
+            sb.append('\"');
         }
     }
 
@@ -562,7 +567,7 @@ public final class Locale
         for (int a = 0; a < n; a++) {
             String prefix = xsr.getNamespacePrefix(a);
 
-            if (prefix == null || prefix.length() == 0) {
+            if (prefix == null || prefix.isEmpty()) {
                 context.attr("xmlns", _xmlnsUri, null,
                     xsr.getNamespaceURI(a));
             } else {
@@ -908,7 +913,7 @@ public final class Locale
     // high speed parser.  Otherwise, use a thread local on
 
     QName makeQName(String uri, String localPart) {
-        assert localPart != null && localPart.length() > 0;
+        assert localPart != null && !localPart.isEmpty();
         // TODO - make sure name is a well formed name?
 
         return _qnameFactory.getQName(uri, localPart);
@@ -2070,6 +2075,14 @@ public final class Locale
         return !_noSync;
     }
 
+    public boolean isLoadStrictFloatingPoint() {
+        return _loadStrictFloatingPoint;
+    }
+
+    public boolean isLoadAllowDecimalExponent() {
+        return _loadAllowDecimalExponent;
+    }
+
     static boolean isWhiteSpace(String s) {
         int l = s.length();
 
@@ -2109,7 +2122,7 @@ public final class Locale
             return true;
         }
 
-        return prefix.length() == 0 && name.getLocalPart().equals("xmlns");
+        return prefix.isEmpty() && name.getLocalPart().equals("xmlns");
     }
 
     QName createXmlns(String prefix) {
@@ -2118,7 +2131,7 @@ public final class Locale
         }
 
         return
-            prefix.length() == 0
+            prefix.isEmpty()
                 ? makeQName(_xmlnsUri, "xmlns", "")
                 : makeQName(_xmlnsUri, prefix, "xmlns");
     }
@@ -2183,7 +2196,7 @@ public final class Locale
                 // as most documents are either without schema or based on xml schema
                 // which ID attributes aren't promoted by the SAXParser, the workaround
                 // is to simply accept all "id" attributes
-                return "id".equalsIgnoreCase(aqn.getLocalPart());
+                return equalsIgnoreCase("id", aqn.getLocalPart());
             }
             String pre = aqn.getPrefix();
             String lName = aqn.getLocalPart();
@@ -2268,7 +2281,7 @@ public final class Locale
         private int _entityBytesLimit = 10240;
         private int _entityBytes = 0;
         private int _insideEntity = 0;
-        private Map<String, String> delayedPrefixMappings = new LinkedHashMap<>();
+        private final Map<String, String> delayedPrefixMappings = new LinkedHashMap<>();
 
         SaxHandler(Locator startLocator) {
             _startLocator = startLocator;
@@ -2309,7 +2322,7 @@ public final class Locale
             // Out current parser does not error when a
             // namespace is used and not defined.  Check for these here
 
-            if (qName.indexOf(':') >= 0 && uri.length() == 0) {
+            if (qName.indexOf(':') >= 0 && uri.isEmpty()) {
                 XmlError err =
                     XmlError.forMessage("Use of undefined namespace prefix: " +
                                         qName.substring(0, qName.indexOf(':')));
@@ -2787,6 +2800,10 @@ public final class Locale
     QNameFactory _qnameFactory;
 
     boolean _validateOnSet;
+
+    boolean _loadStrictFloatingPoint;
+
+    boolean _loadAllowDecimalExponent;
 
     int _posTemp;
 

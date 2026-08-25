@@ -20,6 +20,7 @@ import org.apache.xmlbeans.impl.common.*;
 import org.apache.xmlbeans.impl.schema.SchemaTypeImpl;
 import org.apache.xmlbeans.impl.schema.SchemaTypeVisitorImpl;
 import org.apache.xmlbeans.impl.util.LongUTFDataInputStream;
+import org.apache.xmlbeans.impl.util.MathUtil;
 import org.apache.xmlbeans.impl.validator.Validator;
 import org.w3c.dom.Node;
 import org.xml.sax.ContentHandler;
@@ -1097,7 +1098,7 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
         if ((_flags & FLAG_HASDEFAULT) != 0 && (_flags & FLAG_SETTINGDEFAULT) == 0) {
             // This isn't quite correct since the .equals("") test should be
             // done on the actual text, not the wscanon text
-            if ((_flags & FLAG_ATTRIBUTE) == 0 && v.equals("")) {
+            if ((_flags & FLAG_ATTRIBUTE) == 0 && v.isEmpty()) {
                 String def = get_store().compute_default_text();
                 if (def == null) {
                     throw new XmlValueOutOfRangeException();
@@ -1346,7 +1347,7 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
     // numerics: integral
     public BigInteger getBigIntegerValue() {
         BigDecimal bd = getBigDecimalValue();
-        return bd == null ? null : bd.toBigInteger();
+        return bd == null ? null : MathUtil.toBigInteger(bd);
     }
 
     public byte getByteValue() {
@@ -1379,7 +1380,7 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
         if (l < Integer.MIN_VALUE) {
             throw new XmlValueOutOfRangeException();
         }
-        return (int) l;
+        return Math.toIntExact(l);
     }
 
     private static final BigInteger _max = BigInteger.valueOf(Long.MAX_VALUE);
@@ -1816,13 +1817,6 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
             synchronized (monitor()) {
                 assert (instanceType.getSimpleVariety() == SchemaType.ATOMIC);
                 switch (instanceType.getPrimitiveType().getBuiltinTypeCode()) {
-                    default:
-                        assert (false) : "encountered nonprimitive type.";
-                        // case SchemaType.BTC_ANY_SIMPLE:  This is handled below...
-                        // but we eventually want to handle it with a treecopy, so
-                        // eventually we should break here.
-                        break primitive;
-
                     case SchemaType.BTC_BOOLEAN: {
                         boolean bool = ((SimpleValue) v).getBooleanValue();
                         set_prepare();
@@ -1891,15 +1885,15 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
                                 set_BigInteger(bi);
                                 break;
                             }
-                            default: {
-                                assert (false) : "invalid numeric bit count";
-                                // fallthrough
-                            }
                             case SchemaType.SIZE_BIG_DECIMAL: {
                                 BigDecimal bd = ((SimpleValue) v).getBigDecimalValue();
                                 set_prepare();
                                 set_BigDecimal(bd);
                                 break;
+                            }
+                            default: {
+                                assert (false) : "invalid numeric bit count";
+                                // fallthrough
                             }
                         }
                         break;
@@ -1957,6 +1951,12 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
                         }
                         break;
                     }
+                    default:
+                        assert (false) : "encountered nonprimitive type.";
+                        // case SchemaType.BTC_ANY_SIMPLE:  This is handled below...
+                        // but we eventually want to handle it with a treecopy, so
+                        // eventually we should break here.
+                        break primitive;
                 }
                 set_commit();
                 return; // primitive node tree copy handled.
@@ -2611,7 +2611,7 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
                 }
                 while (xc.toNextSibling(elementName));
             }
-            if (result.size() == 0) {
+            if (result.isEmpty()) {
                 return EMPTY_RESULT;
             } else {
                 return result.toArray(EMPTY_RESULT);
@@ -2651,7 +2651,7 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
                 }
                 while (xc.toNextSibling());
             }
-            if (result.size() == 0) {
+            if (result.isEmpty()) {
                 return EMPTY_RESULT;
             } else {
                 return result.toArray(EMPTY_RESULT);
@@ -2713,7 +2713,7 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
                 while (xc.toNextAttribute());
             }
 
-            if (result.size() == 0) {
+            if (result.isEmpty()) {
                 return EMPTY_RESULT;
             } else {
                 return result.toArray(EMPTY_RESULT);
@@ -2985,8 +2985,7 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
                         // System.out.println("Count: " + count + " " + cur.currentTokenType().toString() + " " + QName.pretty(cur.getName()));
                     }
                 }
-                XmlObject result = cur.getObject();
-                return result;
+                return cur.getObject();
             }
         }
     }
@@ -3044,11 +3043,11 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
                     case SchemaType.SIZE_BIG_INTEGER:
                         return base.getBigIntegerValue();
 
+                    case SchemaType.SIZE_BIG_DECIMAL:
+                        return base.getBigDecimalValue();
                     default:
                         assert (false) : "invalid numeric bit count";
                         // fallthrough
-                    case SchemaType.SIZE_BIG_DECIMAL:
-                        return base.getBigDecimalValue();
                 }
             }
             case SchemaType.BTC_ANY_URI:
@@ -3066,19 +3065,19 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
             case SchemaType.BTC_G_DAY:
             case SchemaType.BTC_G_MONTH:
                 return base.getCalendarValue();
-
+                case SchemaType.BTC_NOTATION:
+            case SchemaType.BTC_STRING:
+            case SchemaType.BTC_ANY_SIMPLE:
+                // return base.getStringValue();
+                return base.getStringValue();
             default:
                 assert (false) : "encountered nonprimitive type.";
                 // fallthrough
 
                 // NB: for string enums we just do java.lang.String
                 // when in the context of unions. It's easier on users.
-            case SchemaType.BTC_NOTATION:
-            case SchemaType.BTC_STRING:
-            case SchemaType.BTC_ANY_SIMPLE:
-                // return base.getStringValue();
-                return base.getStringValue();
         }
+        return null;
     }
 
     /**
@@ -3098,14 +3097,14 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
         return sAttr.getDefaultValue();
     }
 
-    private List<XmlObjectBase> getBaseArray(QName elementName) {
+    private List<XmlObjectBase> getBaseList(QName elementName) {
         check_orphaned();
         List<XmlObjectBase> targetList = new java.util.ArrayList<>();
         get_store().find_all_element_users(elementName, targetList);
         return targetList;
     }
 
-    private List<XmlObjectBase> getBaseArray(QNameSet elementSet) {
+    private List<XmlObjectBase> getBaseList(QNameSet elementSet) {
         check_orphaned();
         List<XmlObjectBase> targetList = new java.util.ArrayList<>();
         get_store().find_all_element_users(elementSet, targetList);
@@ -3114,22 +3113,22 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected <T> T[] getObjectArray(QName elementName, Function<SimpleValue, T> fun, IntFunction<T[]> arrayCon) {
         synchronized (monitor()) {
-            return getBaseArray(elementName).stream().map(fun).toArray(arrayCon);
+            return getBaseList(elementName).stream().map(fun).toArray(arrayCon);
         }
     }
 
     protected <T> T[] getEnumArray(QName elementName, IntFunction<T[]> arrayCon) {
         synchronized (monitor()) {
-            return getBaseArray(elementName).stream().map(SimpleValue::getEnumValue).toArray(arrayCon);
+            return getBaseList(elementName).stream().map(SimpleValue::getEnumValue).toArray(arrayCon);
         }
     }
 
     protected boolean[] getBooleanArray(QName elementName) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementName);
+            List<XmlObjectBase> targetList = getBaseList(elementName);
             boolean[] result = new boolean[targetList.size()];
             for (int i = 0; i < result.length; i++) {
-                result[i] = ((org.apache.xmlbeans.SimpleValue) targetList.get(i)).getBooleanValue();
+                result[i] = targetList.get(i).getBooleanValue();
             }
             return result;
         }
@@ -3137,10 +3136,10 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected float[] getFloatArray(QName elementName) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementName);
+            List<XmlObjectBase> targetList = getBaseList(elementName);
             float[] result = new float[targetList.size()];
             for (int i = 0; i < result.length; i++) {
-                result[i] = ((org.apache.xmlbeans.SimpleValue) targetList.get(i)).getFloatValue();
+                result[i] = targetList.get(i).getFloatValue();
             }
             return result;
         }
@@ -3148,7 +3147,7 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected double[] getDoubleArray(QName elementName) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementName);
+            List<XmlObjectBase> targetList = getBaseList(elementName);
             return targetList.stream()
                 .map(org.apache.xmlbeans.SimpleValue.class::cast)
                 .mapToDouble(org.apache.xmlbeans.SimpleValue::getDoubleValue)
@@ -3158,10 +3157,10 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected byte[] getByteArray(QName elementName) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementName);
+            List<XmlObjectBase> targetList = getBaseList(elementName);
             byte[] result = new byte[targetList.size()];
             for (int i = 0; i < result.length; i++) {
-                result[i] = ((org.apache.xmlbeans.SimpleValue) targetList.get(i)).getByteValue();
+                result[i] = targetList.get(i).getByteValue();
             }
             return result;
         }
@@ -3169,10 +3168,10 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected short[] getShortArray(QName elementName) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementName);
+            List<XmlObjectBase> targetList = getBaseList(elementName);
             short[] result = new short[targetList.size()];
             for (int i = 0; i < result.length; i++) {
-                result[i] = ((org.apache.xmlbeans.SimpleValue) targetList.get(i)).getShortValue();
+                result[i] = targetList.get(i).getShortValue();
             }
             return result;
         }
@@ -3180,7 +3179,7 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected int[] getIntArray(QName elementName) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementName);
+            List<XmlObjectBase> targetList = getBaseList(elementName);
             return targetList.stream()
                 .map(org.apache.xmlbeans.SimpleValue.class::cast)
                 .mapToInt(org.apache.xmlbeans.SimpleValue::getIntValue)
@@ -3190,7 +3189,7 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected long[] getLongArray(QName elementName) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementName);
+            List<XmlObjectBase> targetList = getBaseList(elementName);
             return targetList.stream()
                 .map(org.apache.xmlbeans.SimpleValue.class::cast)
                 .mapToLong(org.apache.xmlbeans.SimpleValue::getLongValue)
@@ -3200,28 +3199,59 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected <T extends XmlObject> T[] getXmlObjectArray(QName elementName, T[] arrayCon) {
         synchronized (monitor()) {
-            return getBaseArray(elementName).toArray(arrayCon);
+            List<XmlObjectBase> list = getBaseList(elementName);
+            try {
+                return list.toArray(arrayCon);
+            } catch (ArrayStoreException e) {
+                return reportArrayStoreException(list, arrayCon, e);
+            }
+        }
+    }
+
+    protected <T extends XmlObject> T[] getXmlObjectArray(QNameSet elementSet, T[] arrayCon) {
+        synchronized (monitor()) {
+            List<XmlObjectBase> list = getBaseList(elementSet);
+            try {
+                return list.toArray(arrayCon);
+            } catch (ArrayStoreException e) {
+                return reportArrayStoreException(list, arrayCon, e);
+            }
+        }
+    }
+
+    private <T extends XmlObject> T[] reportArrayStoreException(List<XmlObjectBase> list, T[] arrayCon,
+                                                                ArrayStoreException e) {
+        if (list.isEmpty()) {
+            throw e;
+        }
+        String elementClass = list.get(0).getClass().getName();
+        Class<?> arrayClass = arrayCon.getClass().getComponentType();
+        if (arrayClass == null) {
+            throw e;
+        } else {
+            throw new IllegalStateException("The requested return type for the array (" + arrayClass.getName() +
+                    ") is not compatible with the type of underlying elements (" + elementClass + ")", e);
         }
     }
 
     protected <T> T[] getObjectArray(QNameSet elementSet, Function<SimpleValue, T> fun, IntFunction<T[]> arrayCon) {
         synchronized (monitor()) {
-            return getBaseArray(elementSet).stream().map(fun).toArray(arrayCon);
+            return getBaseList(elementSet).stream().map(fun).toArray(arrayCon);
         }
     }
 
     protected <T> T[] getEnumArray(QNameSet elementSet, IntFunction<T[]> arrayCon) {
         synchronized (monitor()) {
-            return getBaseArray(elementSet).stream().map(SimpleValue::getEnumValue).toArray(arrayCon);
+            return getBaseList(elementSet).stream().map(SimpleValue::getEnumValue).toArray(arrayCon);
         }
     }
 
     protected boolean[] getBooleanArray(QNameSet elementSet) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementSet);
+            List<XmlObjectBase> targetList = getBaseList(elementSet);
             boolean[] result = new boolean[targetList.size()];
             for (int i = 0; i < result.length; i++) {
-                result[i] = ((org.apache.xmlbeans.SimpleValue) targetList.get(i)).getBooleanValue();
+                result[i] = targetList.get(i).getBooleanValue();
             }
             return result;
         }
@@ -3229,10 +3259,10 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected float[] getFloatArray(QNameSet elementSet) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementSet);
+            List<XmlObjectBase> targetList = getBaseList(elementSet);
             float[] result = new float[targetList.size()];
             for (int i = 0; i < result.length; i++) {
-                result[i] = ((org.apache.xmlbeans.SimpleValue) targetList.get(i)).getFloatValue();
+                result[i] = targetList.get(i).getFloatValue();
             }
             return result;
         }
@@ -3240,7 +3270,7 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected double[] getDoubleArray(QNameSet elementSet) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementSet);
+            List<XmlObjectBase> targetList = getBaseList(elementSet);
             return targetList.stream()
                 .map(org.apache.xmlbeans.SimpleValue.class::cast)
                 .mapToDouble(org.apache.xmlbeans.SimpleValue::getDoubleValue)
@@ -3250,10 +3280,10 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected byte[] getByteArray(QNameSet elementSet) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementSet);
+            List<XmlObjectBase> targetList = getBaseList(elementSet);
             byte[] result = new byte[targetList.size()];
             for (int i = 0; i < result.length; i++) {
-                result[i] = ((org.apache.xmlbeans.SimpleValue) targetList.get(i)).getByteValue();
+                result[i] = targetList.get(i).getByteValue();
             }
             return result;
         }
@@ -3261,10 +3291,10 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected short[] getShortArray(QNameSet elementSet) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementSet);
+            List<XmlObjectBase> targetList = getBaseList(elementSet);
             short[] result = new short[targetList.size()];
             for (int i = 0; i < result.length; i++) {
-                result[i] = ((org.apache.xmlbeans.SimpleValue) targetList.get(i)).getShortValue();
+                result[i] = targetList.get(i).getShortValue();
             }
             return result;
         }
@@ -3272,7 +3302,7 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected int[] getIntArray(QNameSet elementSet) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementSet);
+            List<XmlObjectBase> targetList = getBaseList(elementSet);
             return targetList.stream()
                 .map(org.apache.xmlbeans.SimpleValue.class::cast)
                 .mapToInt(org.apache.xmlbeans.SimpleValue::getIntValue)
@@ -3282,17 +3312,11 @@ public abstract class XmlObjectBase implements TypeStoreUser, Serializable, XmlO
 
     protected long[] getLongArray(QNameSet elementSet) {
         synchronized (monitor()) {
-            List<XmlObjectBase> targetList = getBaseArray(elementSet);
+            List<XmlObjectBase> targetList = getBaseList(elementSet);
             return targetList.stream()
                 .map(org.apache.xmlbeans.SimpleValue.class::cast)
                 .mapToLong(org.apache.xmlbeans.SimpleValue::getLongValue)
                 .toArray();
-        }
-    }
-
-    protected <T extends XmlObject> T[] getXmlObjectArray(QNameSet elementSet, T[] arrayCon) {
-        synchronized (monitor()) {
-            return getBaseArray(elementSet).toArray(arrayCon);
         }
     }
 

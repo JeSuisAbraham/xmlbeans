@@ -18,6 +18,7 @@ package org.apache.xmlbeans.impl.values;
 import org.apache.xmlbeans.SchemaType;
 import org.apache.xmlbeans.XmlErrorCodes;
 import org.apache.xmlbeans.XmlObject;
+import org.apache.xmlbeans.XmlOptions;
 import org.apache.xmlbeans.impl.common.ValidationContext;
 import org.apache.xmlbeans.impl.schema.BuiltinSchemaTypeSystem;
 import org.apache.xmlbeans.impl.util.XsTypeConverter;
@@ -52,13 +53,23 @@ public abstract class JavaFloatHolder extends XmlObjectBase {
     }
 
     protected void set_text(String s) {
-        set_float(validateLexical(s, _voorVc));
+        boolean strict = has_store() && get_store().get_locale().isLoadStrictFloatingPoint();
+        set_float(validateLexical(s, _voorVc, strict));
     }
 
     public static float validateLexical(String v, ValidationContext context) {
+        return validateLexical(v, context, false);
+    }
+
+    public static float validateLexical(String v, ValidationContext context, boolean strict) {
+        return validateLexical(v, context, strict, XmlOptions.DEFAULT_MAX_NUMBER_CHARS);
+    }
+
+    public static float validateLexical(String v, ValidationContext context, boolean strict,
+                                        int maxNumberOfChars) {
         try {
-            return XsTypeConverter.lexFloat(v);
-        } catch (NumberFormatException e) {
+            return XsTypeConverter.lexFloat(v, strict, maxNumberOfChars);
+        } catch (RuntimeException e) {
             context.invalid(XmlErrorCodes.FLOAT, new Object[]{v});
 
             return Float.NaN;

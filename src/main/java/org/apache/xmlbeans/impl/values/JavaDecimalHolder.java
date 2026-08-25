@@ -18,8 +18,10 @@ package org.apache.xmlbeans.impl.values;
 import org.apache.xmlbeans.SchemaType;
 import org.apache.xmlbeans.XmlErrorCodes;
 import org.apache.xmlbeans.XmlObject;
+import org.apache.xmlbeans.XmlOptions;
 import org.apache.xmlbeans.impl.common.ValidationContext;
 import org.apache.xmlbeans.impl.schema.BuiltinSchemaTypeSystem;
+import org.apache.xmlbeans.impl.util.MathUtil;
 import org.apache.xmlbeans.impl.util.XsTypeConverter;
 
 import java.math.BigDecimal;
@@ -41,13 +43,14 @@ public class JavaDecimalHolder extends XmlObjectBase {
     }
 
     protected void set_text(String s) {
+        boolean allowExponent = has_store() && get_store().get_locale().isLoadAllowDecimalExponent();
         if (_validateOnSet()) {
-            validateLexical(s, _voorVc);
+            validateLexical(s, _voorVc, allowExponent);
         }
 
         try {
-            set_BigDecimal(new BigDecimal(s));
-        } catch (NumberFormatException e) {
+            set_BigDecimal(MathUtil.parseAsBigDecimal(s));
+        } catch (Exception e) {
             _voorVc.invalid(XmlErrorCodes.DECIMAL, new Object[]{s});
         }
     }
@@ -61,6 +64,26 @@ public class JavaDecimalHolder extends XmlObjectBase {
      */
 
     public static void validateLexical(String v, ValidationContext context) {
+        validateLexical(v, context, false);
+    }
+
+    public static void validateLexical(String v, ValidationContext context, boolean allowExponent) {
+        validateLexical(v, context, allowExponent, XmlOptions.DEFAULT_MAX_NUMBER_CHARS);
+    }
+
+    public static void validateLexical(String v, ValidationContext context, boolean allowExponent,
+                                       int maxNumberOfChars) {
+        if (allowExponent) {
+            // long-standing lenient behaviour: accept whatever BigDecimal accepts,
+            // which includes scientific/exponent notation such as "1E5".
+            try {
+                MathUtil.parseAsBigDecimal(v, maxNumberOfChars);
+            } catch (Exception e) {
+                context.invalid(XmlErrorCodes.DECIMAL, new Object[]{v});
+            }
+            return;
+        }
+
         // TODO - will want to validate Chars with built in white space handling
         //        However, this fcn sometimes takes a value with wsr applied
         //        already
@@ -139,7 +162,7 @@ public class JavaDecimalHolder extends XmlObjectBase {
             }
         }
 
-        BigInteger intval = _value.toBigInteger();
+        BigInteger intval = MathUtil.toBigInteger(_value);
 
         if (intval.compareTo(_maxlong) > 0 ||
             intval.compareTo(_minlong) < 0) {

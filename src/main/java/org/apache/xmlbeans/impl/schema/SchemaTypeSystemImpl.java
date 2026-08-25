@@ -16,6 +16,7 @@
 package org.apache.xmlbeans.impl.schema;
 
 import org.apache.xmlbeans.*;
+import org.apache.xmlbeans.impl.common.DefaultClassLoaderResourceLoader;
 import org.apache.xmlbeans.impl.common.QNameHelper;
 import org.apache.xmlbeans.impl.common.XBeanDebug;
 import org.apache.xmlbeans.impl.util.ExceptionUtil;
@@ -163,7 +164,8 @@ public class SchemaTypeSystemImpl extends SchemaTypeLoaderBase implements Schema
     private Map<String, SchemaComponent.Ref> _typeRefsByClassname = new HashMap<>();
     private Set<String> _namespaces;
 
-
+    // the additional config option
+    private String _sourceCodeEncoding ;
 
     static String nameToPathString(String nameForSystem) {
         nameForSystem = nameForSystem.replace('.', '/');
@@ -196,7 +198,7 @@ public class SchemaTypeSystemImpl extends SchemaTypeLoaderBase implements Schema
         _name = fullname.substring(0, fullname.lastIndexOf('.'));
         XBeanDebug.LOG.atTrace().log("Loading type system {}", _name);
         _classloader = indexclass.getClassLoader();
-        _linker = SchemaTypeLoaderImpl.build(null, null, _classloader, getMetadataPath());
+        _linker = SchemaTypeLoaderImpl.build(null, new DefaultClassLoaderResourceLoader(), _classloader, getMetadataPath());
         _resourceLoader = new ClassLoaderResourceLoader(_classloader);
         try {
             initFromHeader();
@@ -220,9 +222,18 @@ public class SchemaTypeSystemImpl extends SchemaTypeLoaderBase implements Schema
     }
 
     public SchemaTypeSystemImpl(ResourceLoader resourceLoader, String name, SchemaTypeLoader linker) {
+        this(resourceLoader, null, name, linker);
+    }
+
+    /**
+     * @since 5.4.0
+     */
+    public SchemaTypeSystemImpl(ResourceLoader resourceLoader, ClassLoader classLoader,
+                                String name, SchemaTypeLoader linker) {
         _name = name;
         _linker = linker;
         _resourceLoader = resourceLoader;
+        _classloader = classLoader;
         try {
             initFromHeader();
         } catch (RuntimeException | Error e) {
@@ -415,6 +426,10 @@ public class SchemaTypeSystemImpl extends SchemaTypeLoaderBase implements Schema
         return result;
     }
 
+    String getSourceCodeEncoding() {
+        return _sourceCodeEncoding ;
+    }
+
     @SuppressWarnings("unchecked")
     private <T extends SchemaComponent.Ref> void buildContainersHelper(Map<QName, SchemaComponent.Ref> elements, BiConsumer<SchemaContainer, T> adder) {
         elements.forEach((k, v) -> adder.accept(getContainerNonNull(k.getNamespaceURI()), (T) v));
@@ -557,7 +572,7 @@ public class SchemaTypeSystemImpl extends SchemaTypeLoaderBase implements Schema
         if (_random == null) {
             try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
                 try (LongUTFDataOutputStream daos = new LongUTFDataOutputStream(baos)) {
-                    // at least 10 bits of unqieueness, right?  Maybe even 50 or 60.
+                    // at least 10 bits of uniqueness, right?  Maybe even 50 or 60.
                     daos.writeInt(System.identityHashCode(SchemaTypeSystemImpl.class));
                     String[] props = new String[]{"user.name", "user.dir", "user.timezone", "user.country", "java.class.path", "java.home", "java.vendor", "java.version", "os.version"};
                     for (String s : props) {
@@ -619,6 +634,7 @@ public class SchemaTypeSystemImpl extends SchemaTypeLoaderBase implements Schema
         _annotations = state.annotations();
         _namespaces = new HashSet<>(Arrays.asList(state.getNamespaces()));
         _containers = state.getContainerMap();
+        _sourceCodeEncoding  = state.sourceCodeEncoding();
         fixupContainers();
         // Checks that data in the containers matches the lookup maps
         assertContainersSynchronized();
@@ -676,6 +692,9 @@ public class SchemaTypeSystemImpl extends SchemaTypeLoaderBase implements Schema
         }
 
         String stringForCode(int code) {
+            if (code < 0 || code >= intsToStrings.size()) {
+                throw new SchemaTypeLoaderException("String code " + code + " out of range", _name, _handle, SchemaTypeLoaderException.UNRECOGNIZED_INDEX_ENTRY);
+            }
             return code == 0 ? null : intsToStrings.get(code);
         }
 
@@ -696,7 +715,7 @@ public class SchemaTypeSystemImpl extends SchemaTypeLoaderBase implements Schema
         }
 
         void readFrom(LongUTFDataInputStream input) {
-            if (intsToStrings.size() != 1 || stringsToInts.size() != 0) {
+            if (intsToStrings.size() != 1 || !stringsToInts.isEmpty()) {
                 throw new IllegalStateException();
             }
 
@@ -706,7 +725,7 @@ public class SchemaTypeSystemImpl extends SchemaTypeLoaderBase implements Schema
                     String str = input.readLongUTF().intern();
                     int code = codeForString(str);
                     if (code != i) {
-                        throw new IllegalStateException();
+                        throw new SchemaTypeLoaderException("Repeated string pool entry", _name, _handle, SchemaTypeLoaderException.UNRECOGNIZED_INDEX_ENTRY);
                     }
                 }
             } catch (IOException e) {

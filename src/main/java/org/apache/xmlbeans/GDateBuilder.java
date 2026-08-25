@@ -22,6 +22,8 @@ import java.util.Calendar;
 import java.util.Date;
 import java.util.TimeZone;
 
+import org.apache.xmlbeans.impl.util.MathUtil;
+
 /**
  * Used to build {@link GDate GDates}.
  * <p>
@@ -695,7 +697,7 @@ public final class GDateBuilder implements GDateSpecification, java.io.Serializa
                 int temp = _M;
                 _M = _modulo(temp, 1, 13);
                 if (hasYear()) {
-                    _CY = _CY + (int) _fQuotient(temp, 1, 13);
+                    _CY = Math.toIntExact(_CY + _fQuotient(temp, 1, 13));
                 }
             }
         }
@@ -787,7 +789,7 @@ public final class GDateBuilder implements GDateSpecification, java.io.Serializa
             // fix months first
             int temp = _M;
             _M = _modulo(temp, 1, 13);
-            _CY = _CY + (int) _fQuotient(temp, 1, 13);
+            _CY = Math.toIntExact(_CY + _fQuotient(temp, 1, 13));
 
             // then pull days out
             int extradays = _D - 1;
@@ -811,7 +813,7 @@ public final class GDateBuilder implements GDateSpecification, java.io.Serializa
         if (_fs != null && (_fs.signum() < 0 || _fs.compareTo(GDate._one) >= 0)) {
             BigDecimal bdcarry = _fs.setScale(0, RoundingMode.FLOOR);
             _fs = _fs.subtract(bdcarry);
-            carry = bdcarry.longValue();
+            carry = MathUtil.toLong(bdcarry);
         }
 
         if (carry != 0 || _s < 0 || _s > 59 || _m < 0 || _m > 50 || _h < 0 || _h > 23) {
@@ -867,7 +869,7 @@ public final class GDateBuilder implements GDateSpecification, java.io.Serializa
             }
 
             // Add months and years
-            temp = _M + sign * month;
+            temp = Math.addExact(_M, Math.multiplyExact(sign, month));
             _M = _modulo(temp, 1, 13);
             _CY = _CY + sign * year + (int) _fQuotient(temp, 1, 13);
 
@@ -1098,7 +1100,7 @@ public final class GDateBuilder implements GDateSpecification, java.io.Serializa
     static Date dateForGDate(GDateSpecification date) {
         long jDate = julianDateForGDate(date);
         long to1970Date = jDate - 2440588;
-        long to1970Ms = 1000 * 60 * 60 * 24 * to1970Date;
+        long to1970Ms = Math.multiplyExact(1000 * 60 * 60 * 24, to1970Date);
 
         to1970Ms += date.getMillisecond();
         to1970Ms += date.getSecond() * 1000L;
@@ -1120,7 +1122,6 @@ public final class GDateBuilder implements GDateSpecification, java.io.Serializa
      * True for leap years.
      */
     private static boolean _isLeapYear(int year) {
-        // BUGBUG: Julian calendar?
         return ((year % 4 == 0) && ((year % 100 != 0) || (year % 400 == 0)));
     }
 
@@ -1136,7 +1137,7 @@ public final class GDateBuilder implements GDateSpecification, java.io.Serializa
      * modulo(a, b) = a - fQuotient(a,b)*b
      */
     private static int _mod(long a, int b, long quotient) {
-        return (int) (a - quotient * b);
+        return Math.toIntExact(a - quotient * b);
     }
 
     /**

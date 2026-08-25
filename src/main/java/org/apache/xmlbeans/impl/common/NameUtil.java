@@ -18,6 +18,8 @@ package org.apache.xmlbeans.impl.common;
 import javax.xml.namespace.QName;
 import java.util.*;
 
+import static org.apache.xmlbeans.impl.util.StringUtil.equalsIgnoreCase;
+
 public class NameUtil {
     // punctuation characters
     public final static char HYPHEN = '\u002D';
@@ -436,7 +438,7 @@ public class NameUtil {
 
         // JAXB draft example implies removal of www
         if (result.size() >= 3 &&
-            result.get(result.size() - 1).toLowerCase(Locale.ROOT).equals("www")) {
+            equalsIgnoreCase(result.get(result.size() - 1), "www")) {
             result.remove(result.size() - 1);
         }
 
@@ -450,7 +452,7 @@ public class NameUtil {
         if (i > 0 && (
             i + 1 + 2 == filename.length() ||
             i + 1 + 3 == filename.length() ||
-            "html".equals(filename.substring(i + 1).toLowerCase(Locale.ROOT)))) {
+            equalsIgnoreCase("html", filename.substring(i + 1)))) {
             return filename.substring(0, i);
         }
 
@@ -463,7 +465,7 @@ public class NameUtil {
 
     public static String getPackageFromNamespace(String uri, boolean useJaxRpcRules) {
         // special case: no namespace -> package "noNamespace"
-        if (uri == null || uri.length() == 0) {
+        if (uri == null || uri.isEmpty()) {
             return "noNamespace";
         }
 
@@ -500,7 +502,7 @@ public class NameUtil {
                 result.set(result.size() - 1, processFilename(result.get(result.size() - 1)));
             }
 
-            if (result.size() > 0) {
+            if (!result.isEmpty()) {
                 List<String> splitdns = splitDNS(result.get(0));
                 result.remove(0);
                 result.addAll(0, splitdns);
@@ -510,7 +512,7 @@ public class NameUtil {
         StringBuilder buf = new StringBuilder();
         for (String s : result) {
             String part = nonJavaKeyword(lowerCamelCase(s, useJaxRpcRules, true));
-            if (part.length() > 0) {
+            if (!part.isEmpty()) {
                 buf.append(part);
                 buf.append('.');
             }
@@ -575,7 +577,7 @@ public class NameUtil {
         StringBuilder buf = new StringBuilder();
         List<String> words = splitWords(xml_name, useJaxRpcRules);
 
-        if (words.size() > 0) {
+        if (!words.isEmpty()) {
             if (!Character.isJavaIdentifierStart(words.get(0).charAt(0))) {
                 buf.append("X");
             }
@@ -608,7 +610,7 @@ public class NameUtil {
         StringBuilder buf = new StringBuilder();
         List<String> words = splitWords(xml_name, useJaxRpcRules);
 
-        if (words.size() > 0) {
+        if (!words.isEmpty()) {
             String first = words.get(0).toLowerCase(Locale.ROOT);
             char f = first.charAt(0);
             if (!Character.isJavaIdentifierStart(f) && fixGeneratedName) {
@@ -643,7 +645,7 @@ public class NameUtil {
      * ncname is xml ncname (i.e. no colons).
      */
     private static void addCapped(List<String> list, String str) {
-        if (str.length() > 0) {
+        if (!str.isEmpty()) {
             list.add(upperCaseFirstLetter(str));
         }
     }

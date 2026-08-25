@@ -15,6 +15,8 @@
 
 package org.apache.xmlbeans;
 
+import org.apache.xmlbeans.impl.util.MathUtil;
+
 import java.math.BigDecimal;
 
 /**
@@ -120,14 +122,18 @@ public final class GDuration implements GDurationSpecification, java.io.Serializ
                 ch = (start < len) ? str.charAt(start) : '\0';
                 if (!GDate.isDigit(ch))
                     break;
-                value = value * 10 + GDate.digitVal(ch);
+                int digit = GDate.digitVal(ch);
+                long newValue = value * 10L + digit;
+                if (newValue > Integer.MAX_VALUE)
+                    throw new IllegalArgumentException("duration field value out of range: " + str);
+                value = Math.toIntExact(newValue);
             }
             if (ch == '.')
             {
                 int i = start;
                 do i += 1;
                 while (i < len && GDate.isDigit(ch = str.charAt(i)));
-                _fs = new BigDecimal(str.subSequence(start, i).toString());
+                _fs = MathUtil.parseAsBigDecimal(str.subSequence(start, i).toString());
                 if (i >= len || ch != 'S')
                     throw new IllegalArgumentException("illegal duration");
                 start = i;

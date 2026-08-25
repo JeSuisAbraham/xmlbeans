@@ -383,6 +383,7 @@ class XsbReader {
         if (n == -1) {
             return null;
         }
+        checkAnnotationCount(n);
         SchemaAnnotation.Attribute[] attributes =
             new SchemaAnnotation.Attribute[n];
         for (int i = 0; i < n; i++) {
@@ -397,6 +398,7 @@ class XsbReader {
 
         // Read documentation items
         n = readInt();
+        checkAnnotationCount(n);
         String[] docStrings = new String[n];
         for (int i = 0; i < n; i++) {
             docStrings[i] = readString();
@@ -404,6 +406,7 @@ class XsbReader {
 
         // Read application info items
         n = readInt();
+        checkAnnotationCount(n);
         String[] appInfoStrings = new String[n];
         for (int i = 0; i < n; i++) {
             appInfoStrings[i] = readString();
@@ -422,6 +425,7 @@ class XsbReader {
 
     List<SchemaAnnotation> readAnnotations() {
         int n = readInt();
+        checkAnnotationCount(n);
         List<SchemaAnnotation> result = new ArrayList<>(n);
         // BUGBUG(radup)
         SchemaContainer container = typeSystem.getContainerNonNull("");
@@ -431,14 +435,31 @@ class XsbReader {
         return result;
     }
 
+    private void checkAnnotationCount(int n) {
+        if (n < 0) {
+            throw new SchemaTypeLoaderException("Invalid annotation count " + n,
+                typeSystem.getName(), _handle, SchemaTypeLoaderException.UNRECOGNIZED_INDEX_ENTRY);
+        }
+    }
+
     SchemaComponent.Ref readHandle() {
         String handle = readString();
         if (handle == null) {
             return null;
         }
 
+        if (handle.isEmpty()) {
+            throw new SchemaTypeLoaderException("Cannot resolve handle " + handle, typeSystem.getName(), _handle, SchemaTypeLoaderException.BAD_HANDLE);
+        }
+
         if (handle.charAt(0) != '_') {
             return typeSystem.getTypePool().refForHandle(handle);
+        }
+
+        // every '_'-prefixed handle is a 4-char tag ("_BI_", "_XT_", ...) plus a
+        // payload; charAt(2) and forPretty(handle, 4) below read past a shorter one
+        if (handle.length() < 4) {
+            throw new SchemaTypeLoaderException("Cannot resolve handle " + handle, typeSystem.getName(), _handle, SchemaTypeLoaderException.BAD_HANDLE);
         }
 
         switch (handle.charAt(2)) {
@@ -741,12 +762,11 @@ class XsbReader {
     }
 
     SchemaModelGroup finishLoadingModelGroup() {
-        QName name = readQName();
-        SchemaContainer container = typeSystem.getContainer(name.getNamespaceURI());
-        checkContainerNotNull(container, name);
-        SchemaModelGroupImpl impl = new SchemaModelGroupImpl(container);
-
         try {
+            QName name = readQName();
+            SchemaContainer container = typeSystem.getContainer(name.getNamespaceURI());
+            checkContainerNotNull(container, name);
+            SchemaModelGroupImpl impl = new SchemaModelGroupImpl(container);
             impl.init(name, readString(), readShort() == 1,
                 atLeast(2, 22, 0) ? readString() : null,
                 atLeast(2, 22, 0) ? readString() : null,
@@ -810,12 +830,11 @@ class XsbReader {
     }
 
     SchemaAttributeGroup finishLoadingAttributeGroup() {
-        QName name = readQName();
-        SchemaContainer container = typeSystem.getContainer(name.getNamespaceURI());
-        checkContainerNotNull(container, name);
-        SchemaAttributeGroupImpl impl = new SchemaAttributeGroupImpl(container);
-
         try {
+            QName name = readQName();
+            SchemaContainer container = typeSystem.getContainer(name.getNamespaceURI());
+            checkContainerNotNull(container, name);
+            SchemaAttributeGroupImpl impl = new SchemaAttributeGroupImpl(container);
             impl.init(name, readString(), readShort() == 1,
                 atLeast(2, 22, 0) ? readString() : null,
                 atLeast(2, 15, 0) && readShort() == 1,
@@ -1755,7 +1774,7 @@ class XsbReader {
 
     byte[] readByteArray() {
         try {
-            int len = _input.readShort();
+            int len = _input.readUnsignedShort();
             byte[] result = new byte[len];
             _input.readFully(result);
             return result;

@@ -26,6 +26,7 @@ package org.apache.xmlbeans.impl.xsd2inst;
 
 import org.apache.xmlbeans.*;
 import org.apache.xmlbeans.impl.util.HexBin;
+import org.apache.xmlbeans.impl.util.MathUtil;
 import org.apache.xmlbeans.soap.SOAPArrayType;
 import org.apache.xmlbeans.soap.SchemaWSDLArrayType;
 
@@ -382,7 +383,7 @@ public class SampleXmlUtil {
     }
 
     private String formatDecimal(String start, SchemaType sType) {
-        BigDecimal result = new BigDecimal(start);
+        BigDecimal result = MathUtil.parseAsBigDecimal(start);
         XmlDecimal xmlD;
         xmlD = (XmlDecimal) sType.getFacet(SchemaType.FACET_MIN_INCLUSIVE);
         BigDecimal min = xmlD != null ? xmlD.getBigDecimalValue() : null;
@@ -408,13 +409,13 @@ public class SampleXmlUtil {
         xmlD = (XmlDecimal) sType.getFacet(SchemaType.FACET_TOTAL_DIGITS);
         int totalDigits = -1;
         if (xmlD != null) {
-            totalDigits = xmlD.getBigDecimalValue().intValue();
+            totalDigits = MathUtil.toInt(xmlD.getBigDecimalValue());
 
             StringBuilder sb = new StringBuilder(totalDigits);
             for (int i = 0; i < totalDigits; i++) {
                 sb.append('9');
             }
-            BigDecimal digitsLimit = new BigDecimal(sb.toString());
+            BigDecimal digitsLimit = MathUtil.parseAsBigDecimal(sb.toString());
             if (max != null && max.compareTo(digitsLimit) > 0) {
                 max = digitsLimit;
                 maxInclusive = true;
@@ -438,14 +439,14 @@ public class SampleXmlUtil {
         if (xmlD == null) {
             increment = new BigDecimal(1);
         } else {
-            fractionDigits = xmlD.getBigDecimalValue().intValue();
+            fractionDigits = MathUtil.toInt(xmlD.getBigDecimalValue());
             if (fractionDigits > 0) {
                 StringBuilder sb = new StringBuilder("0.");
                 for (int i = 1; i < fractionDigits; i++) {
                     sb.append('0');
                 }
                 sb.append('1');
-                increment = new BigDecimal(sb.toString());
+                increment = MathUtil.parseAsBigDecimal(sb.toString());
             } else {
                 increment = BigDecimal.ONE;
             }
@@ -998,7 +999,7 @@ public class SampleXmlUtil {
             prefix = parent.prefixForNamespace(qName.getNamespaceURI());
         }
         String name;
-        if (prefix == null || prefix.length() == 0) {
+        if (prefix == null || prefix.isEmpty()) {
             name = qName.getLocalPart();
         } else {
             name = prefix + ":" + qName.getLocalPart();
